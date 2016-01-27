@@ -31,7 +31,8 @@ def eval_epoch(X, Y, y, sess, stream, crop):
     """
     se = 0.
     for X_mb, y_mb in stream.get_epoch_iterator():
-        feed = {X: X_mb, Y: y_mb[:, crop:-crop, crop:-crop]}
+        y_mb = y_mb[:, crop:-crop, crop:-crop]
+        feed = {X: X_mb, Y: y_mb}
         y_eval = sess.run(y, feed_dict=feed)
         se += np.sum((y_eval - y_mb) ** 2.0)
     rmse = np.sqrt(se / (stream.dataset.num_examples * X_mb.shape[1] ** 2))
@@ -143,7 +144,8 @@ def train(conf, ckpt=None):
             print('--- Epoch %d ---' % epoch)
             # Training
             for X_mb, y_mb in tr_stream.get_epoch_iterator():
-                feed = {X: X_mb, Y: y_mb[:, crop:-crop, crop:-crop]}
+                y_mb = y_mb[:, crop:-crop, crop:-crop]
+                feed = {X: X_mb, Y: y_mb}
                 
                 start_time = time.time()
                 sess.run(apply_grad_op, feed_dict=feed)
@@ -156,8 +158,7 @@ def train(conf, ckpt=None):
                     y_eval = sess.run(y, feed_dict=feed2)
                     duration_eval = time.time() - start_time
                     
-                    psnr = tools.eval_psnr(y_mb[:, crop:-crop, crop:-crop, 0],
-                                           y_eval[:, :, :, 0])
+                    psnr = tools.eval_psnr(y_mb, y_eval)
                     ex_per_step_tr = mb_size * FLAGS.num_gpus / duration_tr
                     ex_per_step_eval = mb_size * FLAGS.num_gpus / duration_eval
                     print(format_str % (datetime.now().time(), step, psnr,

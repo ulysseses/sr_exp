@@ -20,7 +20,7 @@ subnet_name: lista
 prox_name: st
 n_c: 128
 T: 2
-thresh0: 5e-3
+thresh0: 5.E-3
 
 # training
 path_tmp: tmp/scn_victor

@@ -170,11 +170,15 @@ def inference(x, conf):
     n_f = pw*pw*n_chans
 
     crop = max(fw // 2, pw // 2, mw // 2)
-    bs, h, w = _shape(X, static=False)[:-1]
+    with tf.name_scope('shapes'):
+        bs, h, w = _shape(x, static=False)[:-1]
+        bs = tf.identity(bs, name='bs')
+        h = tf.identity(h, name='h')
+        w = tf.identity(w, name='w')
 
     # Initialize constants
     with tf.variable_scope('const_filt'):
-        w_shift1 = tf.constant(_init_shift(n_filt, pw), name='w_shift1')
+        w_shift1 = tf.constant(_init_shift(n_chans, pw), name='w_shift1')
         w_shift2 = tf.constant(_init_shift(1, pw), name='w_shift2')
         w_stitch = tf.constant(_init_stitch(pw), name='w_stitch')
         w_mean = tf.constant(_init_mean(mw), name='w_mean')
@@ -184,6 +188,7 @@ def inference(x, conf):
             initializer=tf.truncated_normal_initializer(0., _relu_std(fw, 1)))
     tf.add_to_collection('decay_vars', w_conv)
     w_conv_name = re.sub('%s_[0-9]*/' % FLAGS.tower_name, '', w_conv.op.name)
+    tf.histogram_summary(w_conv_name, w_conv)
 
     # Variable convolutional layer: extract features
     x_conv = tf.nn.conv2d(x, w_conv, [1, 1, 1, 1], 'SAME', name='X_conv')
@@ -218,7 +223,7 @@ def inference(x, conf):
                 dtype=tf.float32,
                 initializer=tf.constant_initializer(thresh0))
             w_d = tf.get_variable('w_d',
-                [n_c, n_f],
+                [n_c, pw*pw],
                 dtype=tf.float32,
                 initializer=tf.truncated_normal_initializer(0., _relu_std(1, n_c)))
 
@@ -228,19 +233,18 @@ def inference(x, conf):
 
         w_e_name = re.sub('%s_[0-9]*/' % FLAGS.tower_name, '', w_e.op.name)
         w_s_name = re.sub('%s_[0-9]*/' % FLAGS.tower_name, '', w_s.op.name)
-        theta_name = re.sub('%s_[0-9]*/' % FLAGS.tower_name, '', theta.op.name)
+        thresh_name = re.sub('%s_[0-9]*/' % FLAGS.tower_name, '', thresh.op.name)
         w_d_name = re.sub('%s_[0-9]*/' % FLAGS.tower_name, '', w_d.op.name)
-        tf.histogram_summary(w_conv_name, w_conv)
         tf.histogram_summary(w_e_name, w_e)
         tf.histogram_summary(w_s_name, w_s)
-        tf.histogram_summary(theta_name, theta)
+        tf.histogram_summary(thresh_name, thresh)
         tf.histogram_summary(w_d_name, w_d)
 
         x_unit = tf.reshape(x_unit, [-1, n_f])
         z = _lista(x_unit, w_e, w_s, thresh, _st, T)
 
         y0 = tf.matmul(z, w_d, name='y0')
-        y0 = tf.reshape(y0, [-1, pw, pw, 1])
+        y0 = tf.reshape(y0, tf.pack([-1, h, w, pw*pw]))
 
     # Obtain the norm for each overlapping patch of x
     with tf.name_scope('denorm'):
@@ -253,8 +257,8 @@ def inference(x, conf):
     y_stitch = tf.nn.conv2d(y_denorm, w_stitch, [1, 1, 1, 1], 'SAME', name='y_stitch')
 
     # Add the mean filter response of X to y
-    X_mean = tf.nn.conv2d(X, w_mean, [1, 1, 1, 1], 'SAME', name='X_mean')
-    y_out = tf.add(y_stitch, X_mean, name='y_out')
+    x_mean = tf.nn.conv2d(x, w_mean, [1, 1, 1, 1], 'SAME', name='X_mean')
+    y_out = tf.add(y_stitch, x_mean, name='y_out')
 
     # Crop to remove convolution boundary effects
     with tf.variable_scope('crop'):
@@ -264,7 +268,7 @@ def inference(x, conf):
         y_crop = tf.slice(y_out, crop_begin, crop_size, name='y_crop')
 
     y = tf.identity(y_crop, name='y')
-    return y_crop
+    return y
 
 
 def loss(y, Y, conf, scope=None):
