@@ -3,18 +3,18 @@ path_h5: tmp/data.h5
 path_tr: data/BSDS500/train
 path_te: data/BSDS500/test
 path_va: data/BSDS500/val
-cw: 11
-stride: 10
+cw: 5
+stride: 4
 sr: 2
 augment: false
-prune: 0.25
+prune: 0.5
 border: 3
-chunk_size: 20000
-data_cached: false
+chunk_size: 400000
+data_cached: true
 
 # inference
 n_layers: 1
-fw: 3
+fw: 5
 n_chans: 4
 subnet_name: lista
 prox_name: st
@@ -24,7 +24,7 @@ thresh0: 5.E-3
 
 # training
 path_tmp: tmp/scn_victor
-mb_size: 128
+mb_size: 2048
 n_epochs: 3
 l2_reg: 1.E-3
 lr0: 1.E-3

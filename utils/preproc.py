@@ -308,6 +308,10 @@ def store_hdf5(conf, pp=None, **kwargs):
     fns_te = _get_filenames(path_te)
     fns_va = _get_filenames(path_va)
 
+    fns_tr = fns_tr[:len(fns_tr) // 4]
+    fns_te = fns_te[:len(fns_te) // 4]
+    fns_va = fns_va[:len(fns_va) // 4]
+
     n_tr, n_te, n_va = 0, 0, 0
     for fn in fns_tr:
         img = shave(modcrop(sm.imread(fn), sr), border)

@@ -78,6 +78,7 @@ def train(conf, ckpt=None):
         # Calculate the gradients for each model tower
         tower_grads = []
         y_splits = []
+        sq_loss_lst = []
         for i in range(FLAGS.num_gpus):
             with tf.device(('/gpu:%d' % i) if FLAGS.dev_assign else None):
                 with tf.name_scope('%s_%02d' % (FLAGS.tower_name, i)) as scope:
@@ -85,7 +86,8 @@ def train(conf, ckpt=None):
                     # the entire model but shares the variables across all towers.
                     y_split = model.inference(X_splits[i], conf)
                     y_splits.append(y_split)
-                    total_loss = model.loss(y_split, Y_splits[i], conf, scope)
+                    total_loss, sq_loss = model.loss(y_split, Y_splits[i], conf, scope)
+                    sq_loss_lst.append(sq_loss)
 
                     # Calculate the gradients for the batch of data on this tower.
                     gvs = opt.compute_gradients(total_loss)
@@ -104,6 +106,7 @@ def train(conf, ckpt=None):
                     summs = tf.get_collection(tf.GraphKeys.SUMMARIES, scope)
 
         y = tf.concat(0, y_splits, name='y')
+        total_sq_loss = tf.add_n(sq_loss_lst, name='total_sq_loss')
 
         # We must calculate the mean of each gradient. Note that this is the
         # synchronization point across all towers.
@@ -130,13 +133,15 @@ def train(conf, ckpt=None):
         print('approx baseline psnr=%.3f' % bpsnr)
 
         # Train
-        format_str = ('%s| %04d PSNR=%.3f (Train: %.1fex/s; %.1fs/batch)'
-                      '(Eval: %.1fex/s; %.1fs/batch)')
+        format_str = ('%s| %04d PSNR=%.3f (Tr: %.1fex/s; %.1fs/batch)'
+                      '(Te: %.1fex/s; %.1fs/batch)')
         step = 0
         for epoch in range(n_epochs):
             print('--- Epoch %d ---' % epoch)
             # Training
+            print(datetime.now().time())
             for X_mb, y_mb in tr_stream.get_epoch_iterator():
+                print(datetime.now().time())
                 feed = {X: X_mb, Y: y_mb}
                 
                 start_time = time.time()
@@ -144,13 +149,16 @@ def train(conf, ckpt=None):
                 duration_tr = time.time() - start_time
 
                 if step % 10 == 0:
-                    feed2 = {X: X_mb}
+                    #feed2 = {X: X_mb}
                     
                     start_time = time.time()
-                    y_eval = sess.run(y, feed_dict=feed2)
+                    #y_eval = sess.run(y, feed_dict=feed2)
+                    sqerr = 2*sess.run(total_sq_loss, feed_dict=feed)
                     duration_eval = time.time() - start_time
                     
-                    psnr = tools.eval_psnr(y_mb, y_eval)
+                    #psnr = tools.eval_psnr(y_mb, y_eval)
+                    rmse = np.sqrt(sqerr / y_mb.size)
+                    psnr = 20 * np.log10(1. / rmse)
                     ex_per_step_tr = mb_size * FLAGS.num_gpus / duration_tr
                     ex_per_step_eval = mb_size * FLAGS.num_gpus / duration_eval
                     print(format_str % (datetime.now().time(), step, psnr,

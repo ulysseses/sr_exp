@@ -4,7 +4,7 @@ from six.moves import range, zip
 import re
 import numpy as np
 import tensorflow as tf
-from tensorflow.python.control_flow_ops import case
+from tensorflow.python import control_flow_ops
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -234,7 +234,8 @@ def _lcod(x, w_e, w_s, thresh, prox_op, T, slope=None):
                 b = tf.add(b, tf.matmul(e, s_slice), name='b')
                 z_bar_k = tf.slice(z_bar, tf.pack([0, k]), [-1, 1], name='z_bar_k')
                 z_k = tf.slice(z, tf.pack([0, k]), [-1, 1], name='z_k')
-                forget_z, update_z = case({tf.equal(k, 0): f1, tf.equal(k, n_c - 1)},
+                forget_z, update_z = control_flow_ops.case({tf.equal(k, 0): f1, \
+                    tf.equal(k, n_c - 1): f2},
                     default=f3, exclusive=False)
                 z = tf.identity(z - forget_z + update_z, name='z')
             else:
@@ -292,15 +293,16 @@ def inference(x, conf):
     
     # Feature Extraction
     for i in range(n_layers):
-        with tf.variable('extract_%02d' % i):
+        with tf.variable_scope('extract_%02d' % i):
             if i == 0:
                 shp = [fw, fw, 1, n_chans]
                 prev = x
             else:
                 shp = [fw, fw, n_chans, n_chans]
             cl = _conv_layer(shp, prev)
-            prev = tf.nn.relu(cl, name='relu')
-            _act_summ(prev)
+            #prev = tf.nn.relu(cl, name='relu')
+            #_act_summ(prev)
+            prev = cl
     
     # Sub-network
     with tf.variable_scope(subnet_name):
@@ -345,7 +347,6 @@ def inference(x, conf):
         w_s_name = re.sub('%s_[0-9]*/' % FLAGS.tower_name, '', w_s.op.name)
         thresh_name = re.sub('%s_[0-9]*/' % FLAGS.tower_name, '', thresh.op.name)
         w_d_name = re.sub('%s_[0-9]*/' % FLAGS.tower_name, '', w_d.op.name)
-        tf.histogram_summary(w_conv_name, w_conv)
         tf.histogram_summary(w_e_name, w_e)
         tf.histogram_summary(w_s_name, w_s)
         tf.histogram_summary(thresh_name, thresh)
@@ -354,7 +355,7 @@ def inference(x, conf):
             tf.histogram_summary(slope_name, slope)
         tf.histogram_summary(w_d_name, w_d)
 
-        x1 = tf.reshape(prev, [-1, n_f]), name='x1')
+        x1 = tf.reshape(prev, [-1, n_f], name='x1')
         z = subnet(x1, w_e, w_s, thresh, prox_op, T, slope=slope)
 
         prev = tf.matmul(z, w_d, name='y0')
@@ -362,15 +363,16 @@ def inference(x, conf):
 
     # Reconstruction
     for i in range(n_layers):
-        with tf.variable('recon_%02d' % i):
+        with tf.variable_scope('recon_%02d' % i):
             if i == n_layers - 1:
                 shp = [fw, fw, n_chans, 1]
             else:
                 shp = [fw, fw, n_chans, n_chans]
             cl = _conv_layer(shp, prev)
-            if i != n_layers - 1:
-                prev = tf.nn.relu(cl, name='relu')
-                _act_summ(prev)
+            #if i != n_layers - 1:
+            #    prev = tf.nn.relu(cl, name='relu')
+            #    _act_summ(prev)
+            prev = cl
 
     # Residual Learning
     y = tf.add(cl, x)
@@ -409,4 +411,4 @@ def loss(y, Y, conf, scope=None):
         loss_name = re.sub('%s_[0-9]*/' % FLAGS.tower_name, '', loss.op.name)
         tf.scalar_summary(loss_name, loss)
 
-    return total_loss
+    return total_loss, sq_loss
