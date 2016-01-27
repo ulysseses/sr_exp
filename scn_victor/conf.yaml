@@ -1,0 +1,33 @@
+# store_hdf5
+path_h5: tmp/data.h5
+path_tr: data/BSDS500/train
+path_te: data/BSDS500/test
+path_va: data/BSDS500/val
+cw: 11
+stride: 10
+sr: 2
+augment: false
+prune: 0.25
+border: 3
+chunk_size: 20000
+data_cached: false
+
+# inference
+n_layers: 1
+fw: 3
+n_chans: 4
+subnet_name: lista
+prox_name: st
+n_c: 128
+T: 2
+thresh0: 5e-3
+
+# training
+path_tmp: tmp/scn_victor
+mb_size: 128
+n_epochs: 3
+l2_reg: 1.E-3
+lr0: 1.E-3
+n_epochs_per_decay: 1
+lr_decay_factor: 0.1
+grad_norm_thresh: 50
