@@ -332,10 +332,10 @@ def store_hdf5(conf, pp=None, **kwargs):
         n_tr += _num_crops(img, cw, stride)
     for fn in fns_te:
         img = shave(modcrop(sm.imread(fn), sr), border)
-        n_te += _num_crops(img, cw, stride)
+        n_te += _num_crops(img, cw, stride)  # stride <-- cw
     for fn in fns_va:
         img = shave(modcrop(sm.imread(fn), sr), border)
-        n_va += _num_crops(img, cw, stride)
+        n_va += _num_crops(img, cw, stride)  # stride <-- cw
 
     # Prune out low-variance crops
     if prune > 0:
@@ -394,7 +394,7 @@ def store_hdf5(conf, pp=None, **kwargs):
         img_lr, img_hr = byte2unit(img_lr), byte2unit(img_hr)
         crop_ind = _store_crops(lrs, hrs, img_lr, img_hr, crop_ind, f, LRh5, HRh5,
                                 #chunk_size, cw, stride, 0)
-                                chunk_size, cw, cw, 0)
+                                chunk_size, cw, stride, 0)
     f.close()
     assert crop_ind == n_actual + n_te + n_va
     duration = time.time() - start_time

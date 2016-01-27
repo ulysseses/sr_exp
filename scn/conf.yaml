@@ -4,13 +4,13 @@ path_tr: data/BSDS500/train
 path_te: data/BSDS500/test
 path_va: data/BSDS500/val
 cw: 56
-stride: 55
+stride: 56
 sr: 2
 augment: true
 prune: 0.0
 border: 3
 chunk_size: 20000
-data_cached: true
+data_cached: false
 
 # inference
 fw: 3

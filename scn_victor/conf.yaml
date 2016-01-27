@@ -10,7 +10,7 @@ augment: true
 prune: 0.0
 border: 3
 chunk_size: 100000
-data_cached: true
+data_cached: false
 
 # inference
 n_layers: 1
