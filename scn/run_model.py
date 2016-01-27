@@ -15,13 +15,13 @@ FLAGS = tf.app.flags.FLAGS
 from scn import model
 
 
-def eval_epoch(X, Y, y, sess, stream, crop):
+def eval_epoch(Xs, Ys, y, sess, stream, crop):
     """
     Evaluate the model against a dataset, and return the PSNR.
 
     Args:
-      X: example placeholder
-      Y: label placeholder
+      Xs: example placeholders list
+      Ys: label placeholders list
       y: model output tensor
       sess: session
       stream: DataStream for the dataset
@@ -30,12 +30,24 @@ def eval_epoch(X, Y, y, sess, stream, crop):
       psnr: PSNR of model's inference on dataset
     """
     se = 0.
-    for X_mb, y_mb in stream.get_epoch_iterator():
-        y_mb = y_mb[:, crop:-crop, crop:-crop]
-        feed = {X: X_mb, Y: y_mb}
+    for X_c, y_c in stream.get_epoch_iterator():
+        chunk_size = X_c.shape[0]
+        gpu_chunk = chunk_size // FLAGS.num_gpus
+        dict_input1 = [(Xs[i], X_c[i*gpu_chunk : \
+                                   ((i + 1)*gpu_chunk) \
+                                   if (i != FLAGS.num_gpus - 1) \
+                                   else chunk_size]) \
+                       for i in range(FLAGS.num_gpus)]
+        dict_input2 = [(Ys[i], y_c[i*gpu_chunk : \
+                                   ((i + 1)*gpu_chunk) \
+                                   if (i != FLAGS.num_gpus - 1) \
+                                   else chunk_size,
+                                   crop:-crop, crop:-crop]) \
+                       for i in range(FLAGS.num_gpus)]
+        feed = dict(dict_input1 + dict_input2)
         y_eval = sess.run(y, feed_dict=feed)
         se += np.sum((y_eval - y_mb) ** 2.0)
-    rmse = np.sqrt(se / (stream.dataset.num_examples * X_mb.shape[1] ** 2))
+    rmse = np.sqrt(se / (stream.dataset.num_examples * y_c.shape[1] * y_c.shape[2]))
     psnr = 20 * np.log10(1.0 / rmse)
     return psnr
 
@@ -76,11 +88,11 @@ def train(conf, ckpt=None):
         # Create an optimizer that performs gradient descent
         opt = tf.train.AdamOptimizer(lr)
 
-        # Model Graph
-        X = tf.placeholder(tf.float32, [None, cw, cw, 1], name='X')
-        Y = tf.placeholder(tf.float32, [None, cw - 2*crop, cw - 2*crop, 1], name='Y')
-        X_splits = tf.split(0, FLAGS.num_gpus, X, name='X_splits')
-        Y_splits = tf.split(0, FLAGS.num_gpus, Y, name='Y_splits')
+        # Placeholders
+        Xs = [tf.placeholder(tf.float32, [None, cw, cw, 1], name='X_%02d' % i) \
+              for i in range(FLAGS.num_gpus)]
+        Ys = [tf.placeholder(tf.float32, [None, cw, cw, 1], name='Y_%02d' % i) \
+              for i in range(FLAGS.num_gpus)]
 
         # Calculate the gradients for each model tower
         tower_grads = []
@@ -137,22 +149,34 @@ def train(conf, ckpt=None):
         print('approx baseline psnr=%.3f' % bpsnr)
 
         # Train
-        format_str = ('%s| %04d PSNR=%.3f (Train: %.1fex/s; %.1fs/batch)'
-                      '(Eval: %.1fex/s; %.1fs/batch)')
+        format_str = ('%s| %04d PSNR=%.3f (Tr: %.1fex/s; %.1fs/batch)'
+                      '(Te: %.1fex/s; %.1fs/batch)')
         step = 0
         for epoch in range(n_epochs):
             print('--- Epoch %d ---' % epoch)
             # Training
-            for X_mb, y_mb in tr_stream.get_epoch_iterator():
-                y_mb = y_mb[:, crop:-crop, crop:-crop]
-                feed = {X: X_mb, Y: y_mb}
+            for X_c, y_c in tr_stream.get_epoch_iterator():
+                chunk_size = X_c.shape[0]
+                gpu_chunk = chunk_size // FLAGS.num_gpus
+                dict_input1 = [(Xs[i], X_c[i*gpu_chunk : \
+                                           ((i + 1)*gpu_chunk) \
+                                           if (i != FLAGS.num_gpus - 1) \
+                                           else chunk_size]) \
+                               for i in range(FLAGS.num_gpus)]
+                dict_input2 = [(Ys[i], y_c[i*gpu_chunk : \
+                                           ((i + 1)*gpu_chunk) \
+                                           if (i != FLAGS.num_gpus - 1) \
+                                           else chunk_size,
+                                           crop:-crop, crop:-crop]) \
+                               for i in range(FLAGS.num_gpus)]
+                feed = dict(dict_input1 + dict_input2)
                 
                 start_time = time.time()
                 sess.run(apply_grad_op, feed_dict=feed)
                 duration_tr = time.time() - start_time
 
                 if step % 10 == 0:
-                    feed2 = {X: X_mb}
+                    feed2 = dict(dict_input1)
                     
                     start_time = time.time()
                     y_eval = sess.run(y, feed_dict=feed2)
@@ -176,8 +200,8 @@ def train(conf, ckpt=None):
                 step += 1
 
             # Evaluation
-            psnr_tr = eval_epoch(X, Y, y, sess, tr_stream, crop)
-            psnr_te = eval_epoch(X, Y, y, sess, te_stream, crop)
+            psnr_tr = eval_epoch(Xs, Ys, y, sess, tr_stream, crop)
+            psnr_te = eval_epoch(Xs, Ys, y, sess, te_stream, crop)
             print('approx psnr_tr=%.3f' % psnr_tr)
             print('approx psnr_te=%.3f' % psnr_te)
             summ_str = sess.run(err_sum_op, feed_dict={psnr_tr_t: psnr_tr,
@@ -192,13 +216,13 @@ def train(conf, ckpt=None):
         te_stream.close()
 
 
-def infer(img, X, y, sess, conf, save=None):
+def infer(img, Xs, y, sess, conf, save=None):
     """
     Upsample with our neural network.
 
     Args:
       img: image to upsample
-      X: input placeholder
+      Xs: input placeholders list
       y: model inference
       sess: session
       conf: configuration dictionary
@@ -214,7 +238,7 @@ def infer(img, X, y, sess, conf, save=None):
 
     cw = conf['cw']
     stride = cw // 2
-    mb_size = 128 * FLAGS.num_gpus
+    mb_size = 128
     path_tmp = conf['path_tmp']
 
     # Bi-cubic up-sample and pre-process
@@ -235,7 +259,15 @@ def infer(img, X, y, sess, conf, save=None):
     crops_out = np.empty((n_y*n_x, cw - 2*crop, cw - 2*crop, 1), dtype='float32')
     start_time1 = time.time()
     for i in range(0, n_y*n_x, FLAGS.num_gpus * mb_size):
-        feed = {X: crops_in[i : i + FLAGS.num_gpus * mb_size]}
+        X_c = crops_in[i : i + FLAGS.num_gpus * mb_size]
+        chunk_size= X_c.shape[0]
+        gpu_chunk = chunk_size // FLAGS.num_gpus
+        dict_input1 = [(Xs[i], X_c[i*gpu_chunk : \
+                                   ((i + 1)*gpu_chunk) \
+                                   if (i != FLAGS.num_gpus - 1) \
+                                   else chunk_size]) \
+                       for i in range(FLAGS.num_gpus)]
+        feed = dict(dict_input1)
         crops_out[i : i + FLAGS.num_gpus * mb_size] = sess.run(y, feed_dict=feed)
     gpu_time = time.time() - start_time1
     
@@ -290,15 +322,15 @@ def eval_te(ckpt, conf):
     n = len(fns_te)
 
     with tf.Graph().as_default(), tf.device('/cpu:0' if FLAGS.dev_assign else None):
-        # Model Graph
-        X = tf.placeholder('float32', [None, cw, cw, 1], name='X')
-        X_split = tf.split(0, FLAGS.num_gpus, X, name='X_split')
+        # Placeholders
+        Xs = [tf.placeholder(tf.float32, [None, cw, cw, 1], name='X_%02d' % i) \
+              for i in range(FLAGS.num_gpus)]
 
         y_splits = []
         for i in range(FLAGS.num_gpus):
             with tf.device(('/gpu:%d' % i) if FLAGS.dev_assign else None):
                 with tf.name_scope('%s_%02d' % (FLAGS.tower_name, i)) as scope:
-                    y_split = model.inference(X_split[i], conf)
+                    y_split = model.inference(Xs[i], conf)
                     y_splits.append(y_split)
                     tf.get_variable_scope().reuse_variables()
         y = tf.concat(0, y_splits, name='y')
@@ -307,7 +339,7 @@ def eval_te(ckpt, conf):
         tmse = 0
         for fn in fns_te:
             lr, gt = preproc.lr_hr(sm.imread(fn), float(sr))
-            hr = infer(lr, X, y, conf)
+            hr = infer(lr, Xs, y, conf)
             # Evaluate
             gt = gt[:hr.shape[0], :hr.shape[1]]
             diff = (gt - hr).astype('float32')

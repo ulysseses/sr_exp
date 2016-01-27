@@ -7,10 +7,10 @@ cw: 5
 stride: 4
 sr: 2
 augment: false
-prune: 0.5
+prune: 0.50
 border: 3
-chunk_size: 400000
-data_cached: true
+chunk_size: 100000
+data_cached: false
 
 # inference
 n_layers: 1

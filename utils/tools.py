@@ -2,6 +2,7 @@ from __future__ import division, absolute_import, print_function
 from six.moves import range, zip
 
 import os
+import time
 import numpy as np
 import scipy.misc as sm
 from fuel.datasets.hdf5 import H5PYDataset
@@ -44,7 +45,9 @@ def prepare_data(conf):
       tr_stream: DataStream for training set
       te_stream: DataStream for testing set
     """
-    preproc.store_hdf5(conf)
+    start = time.time()
+    preproc.store_hdf5(conf)#, compression='lzf')
+    print(time.time() - start)
 
     tr_set = H5PYDataset(conf['path_h5'], ('train',), sources=('LR', 'HR'))
     tr_scheme = ShuffledScheme(examples=tr_set.num_examples,
@@ -223,7 +226,7 @@ def baseline_psnr(te_stream):
     baseline_se = 0.
     for X_mb, y_mb in te_stream.get_epoch_iterator():
         baseline_se += np.sum((y_mb - X_mb) ** 2)
-    N = te_stream.dataset.num_examples * X_mb.shape[1] * X_mb.shape[2]
+    N = te_stream.dataset.num_examples * y_mb.shape[1] * y_mb.shape[2]
     baseline_rmse = np.sqrt(baseline_se / N)
     baseline_psnr = 20 * np.log10(1.0 / baseline_rmse)
     return baseline_psnr
