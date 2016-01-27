@@ -44,7 +44,7 @@ def eval_epoch(Xs, Ys, y, sess, stream):
                        for i in range(FLAGS.num_gpus)]
         feed = dict(dict_input1 + dict_input2)
         y_eval = sess.run(y, feed_dict=feed)
-        se += np.sum((y_eval - y_mb) ** 2.0)
+        se += np.sum((y_eval - y_c) ** 2.0)
     rmse = np.sqrt(se / (stream.dataset.num_examples * y_c.shape[1] * y_c.shape[2]))
     psnr = 20 * np.log10(1.0 / rmse)
     return psnr
@@ -67,7 +67,7 @@ def train(conf, ckpt=None):
     tools.reset_tmp(path_tmp)
 
     # Prepare data
-    tr_stream, te_stream = tools.prepare_data(conf)
+    tr_stream, te_stream = tools.prepare_data(conf, load_in_memory=True)
     n_tr = tr_stream.dataset.num_examples
     n_te = te_stream.dataset.num_examples
 
@@ -90,7 +90,6 @@ def train(conf, ckpt=None):
         # Calculate the gradients for each model tower
         tower_grads = []
         y_splits = []
-        sq_loss_lst = []
         for i in range(FLAGS.num_gpus):
             with tf.device(('/gpu:%d' % i) if FLAGS.dev_assign else None):
                 with tf.name_scope('%s_%02d' % (FLAGS.tower_name, i)) as scope:
@@ -98,8 +97,7 @@ def train(conf, ckpt=None):
                     # the entire model but shares the variables across all towers.
                     y_split = model.inference(Xs[i], conf)
                     y_splits.append(y_split)
-                    total_loss, sq_loss = model.loss(y_split, Ys[i], conf, scope)
-                    sq_loss_lst.append(sq_loss)
+                    total_loss = model.loss(y_split, Ys[i], conf, scope)
 
                     # Calculate the gradients for the batch of data on this tower.
                     gvs = opt.compute_gradients(total_loss)
@@ -118,7 +116,6 @@ def train(conf, ckpt=None):
                     summs = tf.get_collection(tf.GraphKeys.SUMMARIES, scope)
 
         y = tf.concat(0, y_splits, name='y')
-        total_sq_loss = tf.add_n(sq_loss_lst, name='total_sq_loss')
 
         # We must calculate the mean of each gradient. Note that this is the
         # synchronization point across all towers.
@@ -151,10 +148,7 @@ def train(conf, ckpt=None):
         for epoch in range(n_epochs):
             print('--- Epoch %d ---' % epoch)
             # Training
-            print(datetime.now().time())
             for X_c, y_c in tr_stream.get_epoch_iterator():
-                print(datetime.now().time())
-
                 chunk_size = X_c.shape[0]
                 gpu_chunk = chunk_size // FLAGS.num_gpus
                 dict_input1 = [(Xs[i], X_c[i*gpu_chunk : \
@@ -174,16 +168,13 @@ def train(conf, ckpt=None):
                 duration_tr = time.time() - start_time
 
                 if step % 10 == 0:
-                    #feed2 = dict(dict_input1)
+                    feed2 = dict(dict_input1)
                     
                     start_time = time.time()
-                    #y_eval = sess.run(y, feed_dict=feed2)
-                    sqerr = 2*sess.run(total_sq_loss, feed_dict=feed)
+                    y_eval = sess.run(y, feed_dict=feed2)
                     duration_eval = time.time() - start_time
                     
-                    #psnr = tools.eval_psnr(y_c, y_eval)
-                    rmse = np.sqrt(sqerr / y_c.size)
-                    psnr = 20 * np.log10(1. / rmse)
+                    psnr = tools.eval_psnr(y_c, y_eval)
                     ex_per_step_tr = mb_size * FLAGS.num_gpus / duration_tr
                     ex_per_step_eval = mb_size * FLAGS.num_gpus / duration_eval
                     print(format_str % (datetime.now().time(), step, psnr,

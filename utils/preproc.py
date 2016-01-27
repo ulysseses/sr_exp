@@ -312,8 +312,11 @@ def store_hdf5(conf, pp=None, **kwargs):
     data_cached         = conf['data_cached']
 
     if data_cached:
+        print('data already cached...')
         return
-
+    print('caching data...')
+    start_time = time.time()
+    
     # Count number of training/testing examples
     fns_tr = _get_filenames(path_tr)
     fns_te = _get_filenames(path_te)
@@ -350,7 +353,6 @@ def store_hdf5(conf, pp=None, **kwargs):
     print("n_tr:", n_actual)
     print("n_te:", n_te)
     print("n_va:", n_va)
-    #print("n:", n_actual + n_te + n_va)
     
     crop_ind = 0
     lrs = np.empty((chunk_size, cw, cw, 1), dtype=np.float32)
@@ -391,9 +393,12 @@ def store_hdf5(conf, pp=None, **kwargs):
         img_lr, img_hr = lr_hr(img, sr, border)
         img_lr, img_hr = byte2unit(img_lr), byte2unit(img_hr)
         crop_ind = _store_crops(lrs, hrs, img_lr, img_hr, crop_ind, f, LRh5, HRh5,
-                                chunk_size, cw, stride, 0)
+                                #chunk_size, cw, stride, 0)
+                                chunk_size, cw, cw, 0)
     f.close()
     assert crop_ind == n_actual + n_te + n_va
+    duration = time.time() - start_time
+    print("total caching time: %.1f min" % (float(duration) / 60.))
 
 
 def lr_hr(img, sr, border=3):

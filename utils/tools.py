@@ -33,32 +33,39 @@ def reset_tmp(path_tmp):
             print(e)
 
 
-def prepare_data(conf):
+def prepare_data(conf, **kwargs):
     """
     Extract strided crops from a set of images and assemble into a 2D matrix.
     Save into an HDF5 file.
 
     Args:
       conf: dictionary containing data parameters
-
+      kwargs: optional kwargs for H5PYDataset
     Returns:
       tr_stream: DataStream for training set
       te_stream: DataStream for testing set
     """
-    start = time.time()
     preproc.store_hdf5(conf)#, compression='lzf')
-    print(time.time() - start)
 
-    tr_set = H5PYDataset(conf['path_h5'], ('train',), sources=('LR', 'HR'))
+    tr_set = H5PYDataset(conf['path_h5'], ('train',), sources=('LR', 'HR'),
+                         **kwargs)
     tr_scheme = ShuffledScheme(examples=tr_set.num_examples,
                                batch_size=FLAGS.num_gpus * conf['mb_size'])
     tr_stream = DataStream(dataset=tr_set, iteration_scheme=tr_scheme)
 
-    te_set = H5PYDataset(conf['path_h5'], ('test',), sources=('LR', 'HR'))
+    te_set = H5PYDataset(conf['path_h5'], ('test',), sources=('LR', 'HR'),
+                         **kwargs)
     te_scheme = SequentialScheme(examples=te_set.num_examples,
                                  batch_size=FLAGS.num_gpus * conf['mb_size'])
     te_stream = DataStream(dataset=te_set, iteration_scheme=te_scheme)
-
+    
+    if 'load_in_memory' in kwargs:
+        print("training set: %d mb" % ((tr_set.data_sources[0].nbytes + \
+            tr_set.data_sources[1].nbytes) / 1e6))
+        print("testing set: %d mb" % ((te_set.data_sources[0].nbytes + \
+            te_set.data_sources[1].nbytes) / 1e6))
+        time.sleep(2)
+    
     return tr_stream, te_stream
 
 

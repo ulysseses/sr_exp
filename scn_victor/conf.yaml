@@ -6,11 +6,11 @@ path_va: data/BSDS500/val
 cw: 5
 stride: 4
 sr: 2
-augment: false
-prune: 0.50
+augment: true
+prune: 0.0
 border: 3
 chunk_size: 100000
-data_cached: false
+data_cached: true
 
 # inference
 n_layers: 1
@@ -18,16 +18,16 @@ fw: 5
 n_chans: 4
 subnet_name: lista
 prox_name: st
-n_c: 128
-T: 2
+n_c: 192
+T: 3
 thresh0: 5.E-3
 
 # training
 path_tmp: tmp/scn_victor
-mb_size: 2048
-n_epochs: 3
-l2_reg: 1.E-3
+mb_size: 4096
+n_epochs: 6
+l2_reg: 1.E-5
 lr0: 1.E-3
-n_epochs_per_decay: 1
+n_epochs_per_decay: 2
 lr_decay_factor: 0.1
 grad_norm_thresh: 50

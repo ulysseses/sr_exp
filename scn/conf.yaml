@@ -4,10 +4,10 @@ path_tr: data/BSDS500/train
 path_te: data/BSDS500/test
 path_va: data/BSDS500/val
 cw: 56
-stride: 28
+stride: 55
 sr: 2
-augment: false
-prune: 0.25
+augment: true
+prune: 0.0
 border: 3
 chunk_size: 20000
 data_cached: true
@@ -24,9 +24,9 @@ thresh0: 5.E-3
 # training
 path_tmp: tmp/scn
 mb_size: 64
-n_epochs: 3
-l2_reg: 1.E-3
+n_epochs: 6
+l2_reg: 1.E-5
 lr0: 1.E-3
-n_epochs_per_decay: 1
+n_epochs_per_decay: 2
 lr_decay_factor: 0.1
 grad_norm_thresh: 50

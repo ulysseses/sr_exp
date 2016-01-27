@@ -411,4 +411,4 @@ def loss(y, Y, conf, scope=None):
         loss_name = re.sub('%s_[0-9]*/' % FLAGS.tower_name, '', loss.op.name)
         tf.scalar_summary(loss_name, loss)
 
-    return total_loss, sq_loss
+    return total_loss

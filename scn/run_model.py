@@ -31,6 +31,7 @@ def eval_epoch(Xs, Ys, y, sess, stream, crop):
     """
     se = 0.
     for X_c, y_c in stream.get_epoch_iterator():
+        y_c = y_c[:, crop:-crop, crop:-crop]
         chunk_size = X_c.shape[0]
         gpu_chunk = chunk_size // FLAGS.num_gpus
         dict_input1 = [(Xs[i], X_c[i*gpu_chunk : \
@@ -41,12 +42,11 @@ def eval_epoch(Xs, Ys, y, sess, stream, crop):
         dict_input2 = [(Ys[i], y_c[i*gpu_chunk : \
                                    ((i + 1)*gpu_chunk) \
                                    if (i != FLAGS.num_gpus - 1) \
-                                   else chunk_size,
-                                   crop:-crop, crop:-crop]) \
+                                   else chunk_size]) \
                        for i in range(FLAGS.num_gpus)]
         feed = dict(dict_input1 + dict_input2)
         y_eval = sess.run(y, feed_dict=feed)
-        se += np.sum((y_eval - y_mb) ** 2.0)
+        se += np.sum((y_eval - y_c) ** 2.0)
     rmse = np.sqrt(se / (stream.dataset.num_examples * y_c.shape[1] * y_c.shape[2]))
     psnr = 20 * np.log10(1.0 / rmse)
     return psnr
@@ -91,7 +91,8 @@ def train(conf, ckpt=None):
         # Placeholders
         Xs = [tf.placeholder(tf.float32, [None, cw, cw, 1], name='X_%02d' % i) \
               for i in range(FLAGS.num_gpus)]
-        Ys = [tf.placeholder(tf.float32, [None, cw, cw, 1], name='Y_%02d' % i) \
+        Ys = [tf.placeholder(tf.float32, [None, cw - 2*crop, cw - 2*crop, 1],
+                             name='Y_%02d' % i) \
               for i in range(FLAGS.num_gpus)]
 
         # Calculate the gradients for each model tower
@@ -102,9 +103,9 @@ def train(conf, ckpt=None):
                 with tf.name_scope('%s_%02d' % (FLAGS.tower_name, i)) as scope:
                     # Calculate the loss for one tower. This function constructs
                     # the entire model but shares the variables across all towers.
-                    y_split = model.inference(X_splits[i], conf)
+                    y_split = model.inference(Xs[i], conf)
                     y_splits.append(y_split)
-                    total_loss = model.loss(y_split, Y_splits[i], conf, scope)
+                    total_loss = model.loss(y_split, Ys[i], conf, scope)
 
                     # Calculate the gradients for the batch of data on this tower.
                     gvs = opt.compute_gradients(total_loss)
@@ -156,6 +157,7 @@ def train(conf, ckpt=None):
             print('--- Epoch %d ---' % epoch)
             # Training
             for X_c, y_c in tr_stream.get_epoch_iterator():
+                y_c = y_c[:, crop:-crop, crop:-crop]
                 chunk_size = X_c.shape[0]
                 gpu_chunk = chunk_size // FLAGS.num_gpus
                 dict_input1 = [(Xs[i], X_c[i*gpu_chunk : \
@@ -166,8 +168,7 @@ def train(conf, ckpt=None):
                 dict_input2 = [(Ys[i], y_c[i*gpu_chunk : \
                                            ((i + 1)*gpu_chunk) \
                                            if (i != FLAGS.num_gpus - 1) \
-                                           else chunk_size,
-                                           crop:-crop, crop:-crop]) \
+                                           else chunk_size]) \
                                for i in range(FLAGS.num_gpus)]
                 feed = dict(dict_input1 + dict_input2)
                 
@@ -182,7 +183,7 @@ def train(conf, ckpt=None):
                     y_eval = sess.run(y, feed_dict=feed2)
                     duration_eval = time.time() - start_time
                     
-                    psnr = tools.eval_psnr(y_mb, y_eval)
+                    psnr = tools.eval_psnr(y_c, y_eval)
                     ex_per_step_tr = mb_size * FLAGS.num_gpus / duration_tr
                     ex_per_step_eval = mb_size * FLAGS.num_gpus / duration_eval
                     print(format_str % (datetime.now().time(), step, psnr,
@@ -317,6 +318,10 @@ def eval_te(ckpt, conf):
       psnr: psnr of entire test set
     """
     sr = conf['sr']
+    fw = conf['fw']
+    pw = conf['pw']
+    mw = conf['mw']
+    crop = max(fw // 2, pw // 2, mw // 2)
     path_te = conf['path_te']
     fns_te = preproc._get_filenames(path_te)
     n = len(fns_te)
@@ -341,6 +346,7 @@ def eval_te(ckpt, conf):
             lr, gt = preproc.lr_hr(sm.imread(fn), float(sr))
             hr = infer(lr, Xs, y, conf)
             # Evaluate
+            gt = gt[crop:, crop:]
             gt = gt[:hr.shape[0], :hr.shape[1]]
             diff = (gt - hr).astype('float32')
             mse = np.mean(diff ** 2)
