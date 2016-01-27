@@ -214,7 +214,7 @@ def infer(img, X, y, sess, conf, save=None):
 
     cw = conf['cw']
     stride = cw // 2
-    mb_size = 128
+    mb_size = 128 * FLAGS.num_gpus
     path_tmp = conf['path_tmp']
 
     # Bi-cubic up-sample and pre-process

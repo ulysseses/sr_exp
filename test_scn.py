@@ -8,7 +8,7 @@ tf.app.flags.DEFINE_string('tower_name', 'tower',
     """is removed from the names of all summaries when visualizing a model.""")
 tf.app.flags.DEFINE_boolean('log_device_placement', False,
     "Whether to log device placement.")
-tf.app.flags.DEFINE_integer('num_gpus', 1, "How many GPUs to use.")
+tf.app.flags.DEFINE_integer('num_gpus', 3, "How many GPUs to use.")
 tf.app.flags.DEFINE_boolean('dev_assign', True, "Do assign tf.devices.")
 
 

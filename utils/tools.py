@@ -108,7 +108,7 @@ def clip_by_norm(gvs, grad_norm_thresh, scope="grad_clip"):
         return gvs
 
 
-def average_gradients(tower_grads):
+def average_gradients(tower_grads, name='avg_grads_sync'):
     """
     Calculate the average gradient for each shared variable across all towers.
     Note that this function provides a sync-point across all towers.
@@ -117,34 +117,36 @@ def average_gradients(tower_grads):
       tower_grads: list of list of (gradient, variable) tuples. The outer list is
         over individual gradients. The inner list is over the gradient calculation
         for each tower.
+      name: name scope for operations in averaging gradients
     Returns:
       list of pairs of (gradient, variable) where the gradient has been averaged
         across all towers.
     """
-    avg_grads = []
-    for grad_vars in zip(*tower_grads):
-        # Note that each grad_vars looks like the following:
-        # ((grad0_gpu0, var0_gpu), ..., (grad0_gpuN, var0_gpuN))
-        grads = []
-        for g, _ in grad_vars:
-            # Add 0 dimension to the gradients to represent the tower.
-            expanded_g = tf.expand_dims(g, 0)
+    with tf.name_scope(name):
+        avg_grads = []
+        for grad_vars in zip(*tower_grads):
+            # Note that each grad_vars looks like the following:
+            # ((grad0_gpu0, var0_gpu), ..., (grad0_gpuN, var0_gpuN))
+            grads = []
+            for g, _ in grad_vars:
+                # Add 0 dimension to the gradients to represent the tower.
+                expanded_g = tf.expand_dims(g, 0)
+        
+                # Append on a 'tower' dimension which we will average over below.
+                grads.append(expanded_g)
+        
+            # Average over the 'tower' dimension
+            grad = tf.concat(0, grads)
+            grad = tf.reduce_mean(grad, 0)
+        
+            # Keep in mind that the Variables are redundant because they are shared
+            # across towers. So, we will just return the first tower's pointer to
+            # the Variable.
+            v = grad_vars[0][1]
+            grad_var = (grad, v)
+            avg_grads.append(grad_var)
     
-            # Append on a 'tower' dimension which we will average over below.
-            grads.append(expanded_g)
-    
-        # Average over the 'tower' dimension
-        grad = tf.concat(0, grads)
-        grad = tf.reduce_mean(grad, 0)
-    
-        # Keep in mind that the Variables are redundant because they are shared
-        # across towers. So, we will just return the first tower's pointer to
-        # the Variable.
-        v = grad_vars[0][1]
-        grad_var = (grad, v)
-        avg_grads.append(grad_var)
-
-    return avg_grads
+        return avg_grads
 
 
 def track_err():

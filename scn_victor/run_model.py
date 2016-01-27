@@ -150,8 +150,7 @@ def train(conf, ckpt=None):
                     y_eval = sess.run(y, feed_dict=feed2)
                     duration_eval = time.time() - start_time
                     
-                    psnr = tools.eval_psnr(y_mb[:, :, :, 0],
-                                           y_eval[:, :, :, 0])
+                    psnr = tools.eval_psnr(y_mb, y_eval)
                     ex_per_step_tr = mb_size * FLAGS.num_gpus / duration_tr
                     ex_per_step_eval = mb_size * FLAGS.num_gpus / duration_eval
                     print(format_str % (datetime.now().time(), step, psnr,
@@ -202,7 +201,7 @@ def infer(img, X, y, sess, conf, save=None):
     # Relevant parameters
     cw = conf['cw']
     stride = cw // 2
-    mb_size = 128
+    mb_size = 128 * FLAGS.num_gpus
     path_tmp = conf['path_tmp']
 
     # Bi-cubic up-sample and pre-process
