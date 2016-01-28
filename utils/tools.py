@@ -189,9 +189,6 @@ def tf_boilerplate(summs, conf, ckpt=None):
       saver: saver
       summ_writer: summary writer
       summ_op: summary operation
-      err_sum_op: error summary operation
-      psnr_tr_t: training PSNR placeholder
-      psnr_te_t: testing PSNR placeholder
     """
     path_tmp = conf['path_tmp']
 
@@ -203,7 +200,6 @@ def tf_boilerplate(summs, conf, ckpt=None):
         summ_op = tf.merge_all_summaries()
     else:
         summ_op = tf.merge_summary(summs)
-    err_sum_op, psnr_tr_t, psnr_te_t = track_err()
 
     # Initialization
     sess = tf.Session(config=tf.ConfigProto(
@@ -215,7 +211,7 @@ def tf_boilerplate(summs, conf, ckpt=None):
     if ckpt:
         saver.restore(sess, ckpt)
 
-    return sess, saver, summ_writer, summ_op, err_sum_op, psnr_tr_t, psnr_te_t
+    return sess, saver, summ_writer, summ_op
 
 
 def eval_psnr(Y, y):

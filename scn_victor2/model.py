@@ -162,7 +162,7 @@ def inference(x, conf):
     fw = conf['fw']
     pw = conf['pw']
     mw = conf['mw']
-    crop = conf['crop']
+    cropw = conf['cropw']
     n_chans = conf['n_chans']
     n_c = conf['n_c']
     T = conf['T']
@@ -267,9 +267,9 @@ def inference(x, conf):
 
     # Crop to remove convolution boundary effects
     with tf.variable_scope('crop'):
-        crop_begin = tf.convert_to_tensor([0, crop, crop, 0], dtype='int32',
+        crop_begin = tf.convert_to_tensor([0, cropw, cropw, 0], dtype='int32',
                                           name='begin')
-        crop_size = tf.pack([-1, h - 2*crop, w - 2*crop, 1])
+        crop_size = tf.pack([-1, h - 2*cropw, w - 2*cropw, 1])
         y_crop = tf.slice(y_out, crop_begin, crop_size, name='y_crop')
 
     y = tf.identity(y_crop, name='y')

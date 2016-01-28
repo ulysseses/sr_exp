@@ -16,20 +16,18 @@ tf.app.flags.DEFINE_boolean('dev_assign', True, "Do assign tf.devices.")
 def train():
     with open('scn_victor2/conf.yaml', 'r') as f:
         conf = yaml.load(f)
-    if conf['data_cached']:
-        ckpt = tf.train.latest_checkpoint(conf['path_tmp'])
-    else:
-        ckpt = None
-    run_model.train(conf, ckpt)
+    run_model.train(conf)
     
 
 def infer():
     with open('scn_victor2/conf.yaml', 'r') as f:
         conf = yaml.load(f)
-    ckpt = tf.train.latest_checkpoint(conf['path_tmp'])
+    ckpt = tf.train.get_checkpoint_state(conf['path_tmp'])
+    if ckpt:
+        ckpt = ckpt.model_checkpoint_path
     run_model.eval_te(conf, ckpt)
 
 
 if __name__ == '__main__':
-    train()
-    #infer()
+    #train()
+    infer();

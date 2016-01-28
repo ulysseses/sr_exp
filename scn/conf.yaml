@@ -16,7 +16,7 @@ data_cached: true
 fw: 5
 pw: 5
 mw: 7
-crop: 3
+cropw: 3
 n_chans: 4
 n_c: 128
 T: 3
