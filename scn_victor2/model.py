@@ -53,11 +53,11 @@ def _init_stitch(pw):
     Returns:
       stitch: stitch convolutional filter
     """
-    stitch = np.zeros((pw, pw, pw*pw, 1), dtype='float32')
+    stitch = np.zeros((pw, pw, 1, pw*pw), dtype='float32')
     ind = 0
-    for i in range(pw):
-        for j in range(pw):
-            stitch[pw - i - 1, pw - j - 1, ind, 0] = 1. / (pw * pw)
+    for i in range(0, pw):
+        for j in range(0, pw):
+            stitch[pw - i - 1, pw - j - 1, 0, ind] = 1. / (pw*pw)
             ind += 1
     return stitch
 
@@ -170,6 +170,7 @@ def inference(x, conf):
 
     n_f = pw*pw*n_chans
     
+    
     with tf.name_scope('shapes'):
         bs, h, w = _shape(x, static=False)[:-1]
         bs = tf.identity(bs, name='bs')
@@ -197,7 +198,7 @@ def inference(x, conf):
     # A 1D vector along the last dimension of `X_overlap` represents
     # a flattened patch.
     # Each of these patches overlaps one another with stride=1.
-    x_shift1 = tf.nn.depthwise_conv2d(x_conv, w_shift1, [1, 1, 1, 1], 'SAME',
+    x_shift1 = tf.nn.depthwise_conv2d(x_conv, w_shift1, [1, 2, 2, 1], 'SAME',
                                       name='X_shift1')
 
     # L2 normalization: normalize w.r.t. last dimension
@@ -244,17 +245,21 @@ def inference(x, conf):
         z = _lista(x_unit, w_e, w_s, thresh, _st, T)
 
         y0 = tf.matmul(z, w_d, name='y0')
-        y0 = tf.reshape(y0, tf.pack([-1, h, w, pw*pw]))
+        y0 = tf.reshape(y0, tf.pack([-1, h // 2, w // 2, pw*pw]))
 
     # Obtain the norm for each overlapping patch of x
     with tf.name_scope('denorm'):
-        x_shift2 = tf.nn.conv2d(x, w_shift2, [1, 1, 1, 1], 'SAME', name='X_shift2')
+        x_shift2 = tf.nn.conv2d(x, w_shift2, [1, 2, 2, 1], 'SAME', name='X_shift2')
         x_norm = tf.pow(tf.reduce_sum(tf.pow(x_shift2, 2), 3, True), 0.5, name='X_norm')
         y_unit = tf.nn.l2_normalize(y0, 3, name='y_unit')
         y_denorm = tf.mul(y_unit, x_norm * scale_norm, name='y_denorm')
 
     # Average overlaping images together
-    y_stitch = tf.nn.conv2d(y_denorm, w_stitch, [1, 1, 1, 1], 'SAME', name='y_stitch')
+    mask = tf.nn.deconv2d(tf.ones_like(y_denorm, dtype=tf.float32), w_stitch,
+        tf.pack([bs, h, w, 1]), [1, 2, 2, 1], 'SAME', name='mask')
+    y_stitch = tf.nn.deconv2d(y_denorm, w_stitch, tf.pack([bs, h, w, 1]), [1, 2, 2, 1],
+                              'SAME', name='y_stitch')
+    y_stitch = tf.div(y_stitch, mask + 1e-8)
 
     # Add the mean filter response of X to y
     x_mean = tf.nn.conv2d(x, w_mean, [1, 1, 1, 1], 'SAME', name='X_mean')

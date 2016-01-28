@@ -130,7 +130,8 @@ def _gst(x, thresh, slope=None, name=None):
                       tf.nn.bias_add(tf.mul(slope, tf.abs(x)), thresh)))
 
 
-def _lista(x, w_e, w_s, thresh, prox_op, T, slope=None):
+#def _lista(x, w_e, w_s, thresh, prox_op, T, slope=None):
+def _lista(x, w_e, w_s1, w_s2, thresh, prox_op, T, slope=None):
     """
     Learned Iterative Shrinkage-Thresholding Algorithm (LISTA). LISTA is an
     approximately sparse encoder. It approximates (in an L2 sense) a sparse code
@@ -154,7 +155,10 @@ def _lista(x, w_e, w_s, thresh, prox_op, T, slope=None):
     z = prox_op(b, thresh, name='z0')
     for t in range(T):
         with tf.name_scope('itr_%02d' % t):
-            c = b + tf.matmul(z, w_s, name='c')
+            tmp = tf.matmul(z, w_s1)
+            tmp2 = tf.matmul(tmp, w_s2)
+            c = b + tmp2
+            #c = b + tf.matmul(z, w_s, name='c')
             z = prox_op(c, thresh, slope=slope, name='z')
     return z
 
@@ -300,9 +304,9 @@ def inference(x, conf):
             else:
                 shp = [fw, fw, n_chans, n_chans]
             cl = _conv_layer(shp, prev)
-            #prev = tf.nn.relu(cl, name='relu')
-            #_act_summ(prev)
-            prev = cl
+            prev = tf.nn.relu(cl, name='relu')
+            _act_summ(prev)
+            ##prev = cl
     
     # Sub-network
     with tf.variable_scope(subnet_name):
@@ -318,10 +322,26 @@ def inference(x, conf):
                 [n_f, n_c],
                 dtype=tf.float32,
                 initializer=_arr_initializer(e))
-            w_s = tf.get_variable('w_s',
-                [n_c, n_c],
+            
+            #w_s = tf.get_variable('w_s',
+            #    [n_c, n_c],
+            #    dtype=tf.float32,
+            #    initializer=_arr_initializer(s))
+            u_svd, s_svd, vh_svd = np.linalg.svd(s)
+            low_rank = n_c // 4
+            u_svd1 = u_svd[:, :low_rank] * np.sqrt(s_svd[:low_rank])
+            vh_svd1 = (vh_svd[:low_rank, :].T * np.sqrt(s_svd[:low_rank])).T
+            u_svd1 = u_svd1.astype(np.float32)
+            vh_svd1 = vh_svd1.astype(np.float32)
+            w_s1 = tf.get_variable('w_s1',
+                [n_c, low_rank],
                 dtype=tf.float32,
-                initializer=_arr_initializer(s))
+                initializer=_arr_initializer(u_svd1))
+            w_s2 = tf.get_variable('w_s2',
+                [low_rank, n_c],
+                dtype=tf.float32,
+                initializer=_arr_initializer(vh_svd1))
+            
             thresh = tf.get_variable('thresh',
                 [n_c],
                 dtype=tf.float32,
@@ -340,15 +360,27 @@ def inference(x, conf):
                 initializer=tf.truncated_normal_initializer(0., _relu_std(1, n_c)))
 
         tf.add_to_collection('decay_vars', w_e)
-        tf.add_to_collection('decay_vars', w_s)
+        
+        #tf.add_to_collection('decay_vars', w_s)
+        tf.add_to_collection('decay_vars', w_s1)
+        tf.add_to_collection('decay_vars', w_s2)
+        
         tf.add_to_collection('decay_vars', w_d)
 
         w_e_name = re.sub('%s_[0-9]*/' % FLAGS.tower_name, '', w_e.op.name)
-        w_s_name = re.sub('%s_[0-9]*/' % FLAGS.tower_name, '', w_s.op.name)
+        
+        #w_s_name = re.sub('%s_[0-9]*/' % FLAGS.tower_name, '', w_s.op.name)
+        w_s1_name = re.sub('%s_[0-9]*/' % FLAGS.tower_name, '', w_s1.op.name)
+        w_s2_name = re.sub('%s_[0-9]*/' % FLAGS.tower_name, '', w_s2.op.name)
+        
         thresh_name = re.sub('%s_[0-9]*/' % FLAGS.tower_name, '', thresh.op.name)
         w_d_name = re.sub('%s_[0-9]*/' % FLAGS.tower_name, '', w_d.op.name)
         tf.histogram_summary(w_e_name, w_e)
-        tf.histogram_summary(w_s_name, w_s)
+        
+        #tf.histogram_summary(w_s_name, w_s)
+        tf.histogram_summary(w_s1_name, w_s1)
+        tf.histogram_summary(w_s2_name, w_s2)
+        
         tf.histogram_summary(thresh_name, thresh)
         if prox_name == 'gst':
             slope_name = re.sub('%s_[0-9]*/' % FLAGS.tower_name, '', slope.op.name)
@@ -356,23 +388,29 @@ def inference(x, conf):
         tf.histogram_summary(w_d_name, w_d)
 
         x1 = tf.reshape(prev, [-1, n_f], name='x1')
-        z = subnet(x1, w_e, w_s, thresh, prox_op, T, slope=slope)
+        
+        #z = subnet(x1, w_e, w_s, thresh, prox_op, T, slope=slope)
+        z = subnet(x1, w_e, w_s1, w_s2, thresh, prox_op, T, slope=slope)
+        
+        z_name = re.sub('%s_[0-9]*/' % FLAGS.tower_name, '', z.op.name)
+        tf.histogram_summary(z_name, z)
 
         prev = tf.matmul(z, w_d, name='y0')
         prev = tf.reshape(prev, [-1, cw, cw, n_chans])
 
     # Reconstruction
-    for i in range(n_layers):
+    n_recon = 2
+    for i in range(n_recon):
         with tf.variable_scope('recon_%02d' % i):
-            if i == n_layers - 1:
+            if i == n_recon - 1:
                 shp = [fw, fw, n_chans, 1]
             else:
                 shp = [fw, fw, n_chans, n_chans]
             cl = _conv_layer(shp, prev)
-            #if i != n_layers - 1:
-            #    prev = tf.nn.relu(cl, name='relu')
-            #    _act_summ(prev)
-            prev = cl
+            if i != n_recon - 1:
+                prev = tf.nn.relu(cl, name='relu')
+                _act_summ(prev)
+            ##prev = cl
 
     # Residual Learning
     y = tf.add(cl, x)

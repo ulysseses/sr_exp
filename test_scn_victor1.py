@@ -1,5 +1,6 @@
 import yaml
-from scn_victor import run_model
+import os
+from scn_victor1 import run_model
 import tensorflow as tf
 
 tf.app.flags.DEFINE_string('tower_name', 'tower',
@@ -12,11 +13,23 @@ tf.app.flags.DEFINE_integer('num_gpus', 4, "How many GPUs to use.")
 tf.app.flags.DEFINE_boolean('dev_assign', True, "Do assign tf.devices.")
 
 
-def main():
-    with open('scn_victor/conf.yaml', 'r') as f:
+def train():
+    with open('scn_victor1/conf.yaml', 'r') as f:
         conf = yaml.load(f)
-    run_model.train(conf)
+    if conf['data_cached']:
+        ckpt = tf.train.latest_checkpoint(conf['path_tmp'])
+    else:
+        ckpt = None
+    run_model.train(conf, ckpt)
+    
+
+def infer():
+    with open('scn_victor1/conf.yaml', 'r') as f:
+        conf = yaml.load(f)
+    ckpt = tf.train.latest_checkpoint(conf['path_tmp'])
+    run_model.eval_te(conf, ckpt)
 
 
 if __name__ == '__main__':
-    main()
+    train()
+    #infer()

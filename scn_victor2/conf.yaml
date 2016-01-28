@@ -18,9 +18,9 @@ pw: 5
 mw: 7
 crop: 3
 n_chans: 4
-n_c: 128
+n_c: 256
 T: 3
-thresh0: 5.E-3
+thresh0: 9.E-3
 
 # training
 path_tmp: tmp/scn_victor2

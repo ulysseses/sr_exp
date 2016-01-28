@@ -86,7 +86,7 @@ def exp_decay_lr(global_step, n_tr, conf, name='lr'):
     n_epochs_per_decay = conf['n_epochs_per_decay']
     lr_decay_factor = conf['lr_decay_factor']
 
-    n_mb_per_epoch = n_tr / mb_size
+    n_mb_per_epoch = n_tr / (mb_size * FLAGS.num_gpus)
     decay_steps = int(n_mb_per_epoch * n_epochs_per_decay)
     lr = tf.train.exponential_decay(lr0,
                                     global_step,
@@ -210,11 +210,10 @@ def tf_boilerplate(summs, conf, ckpt=None):
         allow_soft_placement=True,
         log_device_placement=FLAGS.log_device_placement))
     summ_writer = tf.train.SummaryWriter(path_tmp, graph_def=sess.graph_def)
-    if ckpt is None:
-        init = tf.initialize_all_variables()
-        sess.run(init)
-    else:
-        saver.restore(ckpt, sess)
+    init = tf.initialize_all_variables()
+    sess.run(init)
+    if ckpt:
+        saver.restore(sess, ckpt)
 
     return sess, saver, summ_writer, summ_op, err_sum_op, psnr_tr_t, psnr_te_t
 
