@@ -4,6 +4,7 @@ from six.moves import range, zip
 import re
 import numpy as np
 import tensorflow as tf
+from tensorflow.python import control_flow_ops
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -139,6 +140,91 @@ def _lista(x, w_e, w_s, thresh, prox_op, T):
     return z
 
 
+def _lcod(x, w_e, w_s, thresh, prox_op, T):
+    """
+    Learned Coordinate Descent (LCoD). LCoD is an approximately sparse encoder. It
+    approximates (in an L2 sense) a sparse code of `x` according to dictionary `w_e`.
+    Note that during backpropagation, `w_e` isn't strictly a dictionary (i.e.
+    dictionary atoms are not strictly normalized).
+
+    LCoD is a differentiable version of greedy coordinate descent.
+
+    Args:
+      x: [n, n_f] tensor
+      w_e: [n_f, n_c] encoder tensor
+      w_s: [n_c, n_f] mutual inhibition tensor
+      thresh: threshold
+      prox_op: proximal operator
+      T: number of iterations
+      slope: here for interfacing; used only for _gst
+    Returns:
+      z: LCoD output
+    """
+    def f1():
+        '''k == 0'''
+        forget_z = tf.concat(1, [z_k, tf.zeros(tf.pack([n, n_c - 1]),
+                                               dtype=tf.float32)],
+                             name='forget_z')
+        update_z = tf.concat(1, [z_bar_k, tf.zeros(tf.pack([n, n_c - 1]),
+                                                   dtype=tf.float32)],
+                             name='update_z')
+        return forget_z, update_z
+
+    def f2():
+        '''k == n_c - 1'''
+        forget_z = tf.concat(1, [tf.zeros(tf.pack([n, n_c - 1]),
+                                          dtype=tf.float32),
+                                 z_k],
+                             name='forget_z')
+        update_z = tf.concat(1, [tf.zeros(tf.pack([n, n_c - 1]),
+                                          dtype=tf.float32),
+                                 z_bar_k],
+                             name='update_z')
+        return forget_z, update_z
+
+    def f3():
+        '''k > 0 and k < n_c - 1'''
+        forget_z = tf.concat(1, [tf.zeros(tf.pack([n, k]),
+                                          dtype=tf.float32),
+                                 z_k,
+                                 tf.zeros(tf.pack([n, n_c - (k + 1)]),
+                                          dtype=tf.float32)],
+                             name='forget_z')
+        update_z = tf.concat(1, [tf.zeros(tf.pack([n, k]),
+                                          dtype=tf.float32),
+                                 z_bar_k,
+                                 tf.zeros(tf.pack([n, n_c - (k + 1)]),
+                                          dtype=tf.float32)],
+                             name='update_z')
+        return forget_z, update_z
+    
+    n = tf.shape(x)[0]
+    n_c = np.int32(w_s.get_shape().as_list()[0])
+    b = tf.matmul(x, w_e, name='b0')  # [n, n_c]
+    z = tf.zeros_like(b, dtype=tf.float32, name='z0')
+    for t in range(T):
+        with tf.name_scope('itr_%02d' % t):
+            if t != T - 1:
+                z_bar = prox_op(b, thresh, name='z_bar')
+                # L1 norm greedy heuristic
+                tmp = z_bar - z
+                tmp2 = tf.abs(tmp)
+                tmp3 = tf.reduce_sum(tmp2, 1)
+                k = tf.to_int32(tf.argmax(tmp3, 0, name='k'))  # tf.int32
+                e = tf.slice(tmp, tf.pack([0, k]), [-1, 1], name='e')
+                s_slice = tf.slice(w_s, tf.pack([0, k]), [1, n_c], name='s_slice')
+                b = tf.add(b, tf.matmul(e, s_slice), name='b')
+                z_bar_k = tf.slice(z_bar, tf.pack([0, k]), [-1, 1], name='z_bar_k')
+                z_k = tf.slice(z, tf.pack([0, k]), [-1, 1], name='z_k')
+                forget_z, update_z = control_flow_ops.case({tf.equal(k, 0): f1, \
+                    tf.equal(k, n_c - 1): f2},
+                    default=f3, exclusive=False)
+                z = tf.identity(z - forget_z + update_z, name='z')
+            else:
+                z = prox_op(b, thresh, name='z')
+    return z
+
+
 def inference(x, conf):
     """
     Sparse Coding Based Network for Super-Resolution. This is a convolutional
@@ -192,18 +278,18 @@ def inference(x, conf):
     tf.histogram_summary(w_conv_name, w_conv)
 
     # Variable convolutional layer: extract features
-    x_conv = tf.nn.conv2d(x, w_conv, [1, 1, 1, 1], 'SAME', name='X_conv')
+    x_conv = tf.nn.conv2d(x, w_conv, [1, 1, 1, 1], 'SAME', name='x_conv')
 
     # Constant convolutional layer: shift to create overlap
     # A 1D vector along the last dimension of `X_overlap` represents
     # a flattened patch.
     # Each of these patches overlaps one another with stride=1.
     x_shift1 = tf.nn.depthwise_conv2d(x_conv, w_shift1, [1, 2, 2, 1], 'SAME',
-                                      name='X_shift1')
+                                      name='x_shift1')
 
     # L2 normalization: normalize w.r.t. last dimension
     # This effectively normalizes each patch
-    x_unit = tf.nn.l2_normalize(x_shift1, 3, name='X_unit')
+    x_unit = tf.nn.l2_normalize(x_shift1, 3, name='x_unit')
 
     # Feed into LISTA
     with tf.variable_scope('lista'):
@@ -243,14 +329,15 @@ def inference(x, conf):
 
         x_unit = tf.reshape(x_unit, [-1, n_f])
         z = _lista(x_unit, w_e, w_s, thresh, _st, T)
+        #z = _lcod(x_unit, w_e, w_s, thresh, _st, T)
 
         y0 = tf.matmul(z, w_d, name='y0')
         y0 = tf.reshape(y0, tf.pack([-1, h // 2, w // 2, pw*pw]))
 
     # Obtain the norm for each overlapping patch of x
     with tf.name_scope('denorm'):
-        x_shift2 = tf.nn.conv2d(x, w_shift2, [1, 2, 2, 1], 'SAME', name='X_shift2')
-        x_norm = tf.pow(tf.reduce_sum(tf.pow(x_shift2, 2), 3, True), 0.5, name='X_norm')
+        x_shift2 = tf.nn.conv2d(x, w_shift2, [1, 2, 2, 1], 'SAME', name='x_shift2')
+        x_norm = tf.pow(tf.reduce_sum(tf.pow(x_shift2, 2), 3, True), 0.5, name='x_norm')
         y_unit = tf.nn.l2_normalize(y0, 3, name='y_unit')
         y_denorm = tf.mul(y_unit, x_norm * scale_norm, name='y_denorm')
 
@@ -262,7 +349,7 @@ def inference(x, conf):
     y_stitch = tf.div(y_stitch, mask + 1e-8)
 
     # Add the mean filter response of X to y
-    x_mean = tf.nn.conv2d(x, w_mean, [1, 1, 1, 1], 'SAME', name='X_mean')
+    x_mean = tf.nn.conv2d(x, w_mean, [1, 1, 1, 1], 'SAME', name='x_mean')
     y_out = tf.add(y_stitch, x_mean, name='y_out')
 
     # Crop to remove convolution boundary effects
