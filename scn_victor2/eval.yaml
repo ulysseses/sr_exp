@@ -4,7 +4,7 @@ path_tr: data/Yang
 path_te: data/Set14
 path_va: data/Set5
 cw: 56
-stride: 50
+stride: 28
 sr: 2
 augment: true
 prune: 0.0

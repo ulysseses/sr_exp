@@ -219,7 +219,7 @@ def _lcod(x, w_e, w_s, thresh, prox_op, T):
                 z_k = tf.slice(z, tf.pack([0, k]), tf.pack([n, 1]), name='z_k')  # [n, 1]
                 forget_z, update_z = control_flow_ops.case({tf.equal(k, 0): f1, \
                     tf.equal(k, n_c - 1): f2},
-                    default=f3(n, n_c), exclusive=False)  # [n, n_c]
+                    default=f3, exclusive=False)  # [n, n_c]
                 z = tf.identity(z - forget_z + update_z, name='z')  # [n, n_c]
             else:
                 z = prox_op(b, thresh, name='z')
@@ -329,8 +329,10 @@ def inference(x, conf):
         tf.histogram_summary(w_d_name, w_d)
 
         x_unit = tf.reshape(x_unit, [-1, n_f])
-        z = _lista(x_unit, w_e, w_s, thresh, _st, T)
-        #z = _lcod(x_unit, w_e, w_s, thresh, _st, T)
+        #z = _lista(x_unit, w_e, w_s, thresh, _st, T)
+        z = _lcod(x_unit, w_e, w_s, thresh, _st, T)
+        z_name = re.sub('%s_[0-9]*/' % FLAGS.tower_name, '', z.op.name)
+        tf.histogram_summary(z_name, z)
 
         y0 = tf.matmul(z, w_d, name='y0')
         y0 = tf.reshape(y0, tf.pack([-1, h // 2, w // 2, pw*pw]))
