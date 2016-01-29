@@ -307,10 +307,10 @@ def eval_te(conf, ckpt):
     Returns:
       psnr: psnr of entire test set
     """
+    path_te = conf['path_te']
     cw = conf['cw']
     sr = conf['sr']
     cropw = conf['cropw']
-    path_te = conf['path_te']
     fns_te = preproc._get_filenames(path_te)
     n = len(fns_te)
 

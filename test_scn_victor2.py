@@ -1,5 +1,4 @@
 import yaml
-import os
 from scn_victor2 import run_model
 import tensorflow as tf
 

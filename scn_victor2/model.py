@@ -201,25 +201,26 @@ def _lcod(x, w_e, w_s, thresh, prox_op, T):
     n = tf.shape(x)[0]
     n_c = np.int32(w_s.get_shape().as_list()[0])
     b = tf.matmul(x, w_e, name='b0')  # [n, n_c]
-    z = tf.zeros_like(b, dtype=tf.float32, name='z0')
+    z = tf.zeros_like(b, dtype=tf.float32, name='z0')  # [n, n_c]
     for t in range(T):
         with tf.name_scope('itr_%02d' % t):
             if t != T - 1:
-                z_bar = prox_op(b, thresh, name='z_bar')
+                z_bar = prox_op(b, thresh, name='z_bar')  # [n, n_c]
                 # L1 norm greedy heuristic
-                tmp = z_bar - z
-                tmp2 = tf.abs(tmp)
-                tmp3 = tf.reduce_sum(tmp2, 1)
+                tmp = z_bar - z  # [n, n_c]
+                tmp2 = tf.abs(tmp)  # [n, n_c]
+                tmp3 = tf.reduce_sum(tmp2, 0)  # [n_c]
                 k = tf.to_int32(tf.argmax(tmp3, 0, name='k'))  # tf.int32
-                e = tf.slice(tmp, tf.pack([0, k]), [-1, 1], name='e')
-                s_slice = tf.slice(w_s, tf.pack([0, k]), [1, n_c], name='s_slice')
-                b = tf.add(b, tf.matmul(e, s_slice), name='b')
-                z_bar_k = tf.slice(z_bar, tf.pack([0, k]), [-1, 1], name='z_bar_k')
-                z_k = tf.slice(z, tf.pack([0, k]), [-1, 1], name='z_k')
+                e = tf.slice(tmp, tf.pack([0, k]), tf.pack([n, 1]), name='e')  # [n, 1]
+                s_slice = tf.slice(w_s, tf.pack([k, 0]), [1, n_c], name='s_slice')  # [1, n_c]
+                b = tf.add(b, tf.matmul(e, s_slice), name='b')  # [n, n_c]
+                z_bar_k = tf.slice(z_bar, tf.pack([0, k]), tf.pack([n, 1]),
+                                   name='z_bar_k')  # [n, 1]
+                z_k = tf.slice(z, tf.pack([0, k]), tf.pack([n, 1]), name='z_k')  # [n, 1]
                 forget_z, update_z = control_flow_ops.case({tf.equal(k, 0): f1, \
                     tf.equal(k, n_c - 1): f2},
-                    default=f3, exclusive=False)
-                z = tf.identity(z - forget_z + update_z, name='z')
+                    default=f3(n, n_c), exclusive=False)  # [n, n_c]
+                z = tf.identity(z - forget_z + update_z, name='z')  # [n, n_c]
             else:
                 z = prox_op(b, thresh, name='z')
     return z

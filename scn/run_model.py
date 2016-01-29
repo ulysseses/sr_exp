@@ -138,12 +138,13 @@ def train(conf, ckpt=None):
                 summs.append(tf.histogram_summary(v_name + '/gradients', g))
 
         # Tensorflow boilerplate
-        sess, saver, summ_writer, summ_op, err_sum_op, psnr_tr_t, psnr_te_t = \
-            tools.tf_boilerplate(summs, conf, ckpt)
+        sess, saver, summ_writer, summ_op = tools.tf_boilerplate(summs, conf, ckpt)
 
         # Baseline error
-        bpsnr = tools.baseline_psnr(te_stream)
-        print('approx baseline psnr=%.3f' % bpsnr)
+        bpsnr_tr = tools.baseline_psnr(tr_stream)
+        bpsnr_te = tools.baseline_psnr(te_stream)
+        print('approx baseline psnr_tr=%.3f' % bpsnr_tr)
+        print('approx baseline psnr_te=%.3f' % bpsnr_te)
 
         # Train
         format_str = ('%s| %04d PSNR=%.3f (Tr: %.1fex/s; %.1fs/batch)'
@@ -172,7 +173,7 @@ def train(conf, ckpt=None):
                 sess.run(apply_grad_op, feed_dict=feed)
                 duration_tr = time.time() - start_time
 
-                if step % 10 == 0:
+                if step % 20 == 0:
                     feed2 = dict(dict_input1)
                     
                     start_time = time.time()
@@ -186,11 +187,11 @@ def train(conf, ckpt=None):
                           ex_per_step_tr, float(duration_tr / FLAGS.num_gpus),
                           ex_per_step_eval, float(duration_eval / FLAGS.num_gpus)))
 
-                if step % 40 == 0:
+                if step % 100 == 0:
                     summ_str = sess.run(summ_op, feed_dict=feed)
                     summ_writer.add_summary(summ_str, step)
 
-                if step % 100 == 0:
+                if step % 400 == 0:
                     saver.save(sess, os.path.join(path_tmp, 'ckpt'),
                         global_step=step)
 
@@ -201,9 +202,6 @@ def train(conf, ckpt=None):
             psnr_te = eval_epoch(Xs, Ys, y, sess, te_stream, cropw)
             print('approx psnr_tr=%.3f' % psnr_tr)
             print('approx psnr_te=%.3f' % psnr_te)
-            summ_str = sess.run(err_sum_op, feed_dict={psnr_tr_t: psnr_tr,
-                                                       psnr_te_t: psnr_te})
-            summ_writer.add_summary(summ_str, epoch)
             saver.save(sess, os.path.join(path_tmp, 'ckpt'),
                        global_step=step)            
 
@@ -309,10 +307,10 @@ def eval_te(conf, ckpt):
     Returns:
       psnr: psnr of entire test set
     """
+    path_te = conf['path_te']
     cw = conf['cw']
     sr = conf['sr']
     cropw = conf['cropw']
-    path_te = conf['path_te']
     fns_te = preproc._get_filenames(path_te)
     n = len(fns_te)
 

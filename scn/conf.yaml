@@ -1,8 +1,8 @@
 # store_hdf5
 path_h5: tmp/data.h5
-path_tr: data/BSDS500/train
-path_te: data/BSDS500/test
-path_va: data/BSDS500/val
+path_tr: data/Yang
+path_te: data/Set14
+path_va: data/Set5
 cw: 56
 stride: 50
 sr: 2
@@ -23,7 +23,7 @@ T: 3
 thresh0: 5.E-3
 
 # training
-path_tmp: tmp/scn_victor2
+path_tmp: tmp/scn
 mb_size: 64
 n_epochs: 6
 l2_reg: 1.E-5
