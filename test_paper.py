@@ -1,5 +1,7 @@
+#!/usr/bin/env python
+import sys
 import yaml
-from scn_victor2 import run_model
+from paper import run_model
 import tensorflow as tf
 
 tf.app.flags.DEFINE_string('tower_name', 'tower',
@@ -12,14 +14,14 @@ tf.app.flags.DEFINE_integer('num_gpus', 4, "How many GPUs to use.")
 tf.app.flags.DEFINE_boolean('dev_assign', True, "Do assign tf.devices.")
 
 
-def train():
-    with open('scn_victor2/conf.yaml', 'r') as f:
+def train(path):
+    with open(path, 'r') as f:
         conf = yaml.load(f)
     run_model.train(conf)
     
 
-def infer():
-    with open('scn_victor2/conf.yaml', 'r') as f:
+def infer(path):
+    with open(path, 'r') as f:
         conf = yaml.load(f)
     ckpt = tf.train.get_checkpoint_state(conf['path_tmp'])
     if ckpt:
@@ -28,5 +30,11 @@ def infer():
 
 
 if __name__ == '__main__':
-    train()
-    #infer();
+    command = sys.argv[0]
+    path = sys.argv[1]
+    if command[2:].lower() == 'tr':
+        train(path)
+    elif command[2:].lower() == 'in':
+        infer(path)
+    else:
+        raise ValueError('command %s not recognized' % command)

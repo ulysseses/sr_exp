@@ -17,7 +17,7 @@ def train():
         conf = yaml.load(f)
     run_model.train(conf)
     
-    
+
 def infer():
     with open('scn/conf.yaml', 'r') as f:
         conf = yaml.load(f)

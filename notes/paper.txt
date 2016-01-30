@@ -1,0 +1,7 @@
+1. norm vs res
+2. stride=1 vs stride=2
+3. S vs S = UV
+4. explicit L1 prior on z
+5. gst vs st
+6. lista vs lcod
+7. comparison with VDSR/DRCN

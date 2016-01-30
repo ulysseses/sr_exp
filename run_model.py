@@ -12,7 +12,7 @@ import tensorflow as tf
 from utils import preproc, tools
 
 FLAGS = tf.app.flags.FLAGS
-from scn_victor2 import model
+import model
 
 
 def eval_epoch(Xs, Ys, y, sess, stream, cropw):

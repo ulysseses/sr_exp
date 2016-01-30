@@ -1,5 +1,5 @@
 # store_hdf5
-path_tmp: tmp/scn
+path_tmp: tmp/scn_victor
 path_tr: data/Yang
 path_te: data/Set14
 path_va: data/Set5

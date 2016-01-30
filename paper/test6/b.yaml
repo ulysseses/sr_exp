@@ -1,5 +1,5 @@
 # store_hdf5
-path_tmp: tmp/scn
+path_tmp: tmp/paper/test1
 path_tr: data/Yang
 path_te: data/Set14
 path_va: data/Set5
@@ -15,17 +15,23 @@ data_cached: false
 # inference
 fw: 5
 pw: 5
+ps: ####################
 n_chans: 4
 n_c: 256
-T: 6
-mw: 7
+T: 3
 cropw: 3
+res: ####################
+mw: 7
 thresh0: 9.E-3
+subnet_name: lcod  ####################
+prox_name: ####################
+low_rank: ####################
 
 # training
 load_in_memory: true
 mb_size: 32
 n_epochs: 6
+l1_reg: ####################
 l2_reg: 1.E-5
 lr0: 1.E-3
 n_epochs_per_decay: 2

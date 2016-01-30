@@ -17,7 +17,8 @@ FLAGS = tf.app.flags.FLAGS
 
 def reset_tmp(path_tmp):
     """
-    If path_tmp doesn't exist, create it. Otherwise, delete path_tmp.
+    If path_tmp doesn't exist, create it.
+    Otherwise, delete all non-.h5 files in path_tmp.
     """
     # If path_tmp doesn't exist, create it
     if not os.path.exists(path_tmp):
@@ -25,6 +26,8 @@ def reset_tmp(path_tmp):
     
     # Delete files in path_tmp
     for f in os.listdir(path_tmp):
+        if f.split('.')[-1] == 'h5':  # skip data file
+            continue
         fp = os.path.join(path_tmp, f)
         try:
             if os.path.isfile(fp):
@@ -33,33 +36,34 @@ def reset_tmp(path_tmp):
             print(e)
 
 
-def prepare_data(conf, **kwargs):
+def prepare_data(conf):
     """
     Extract strided crops from a set of images and assemble into a 2D matrix.
     Save into an HDF5 file.
 
     Args:
       conf: dictionary containing data parameters
-      kwargs: optional kwargs for H5PYDataset
     Returns:
       tr_stream: DataStream for training set
       te_stream: DataStream for testing set
     """
     preproc.store_hdf5(conf)#, compression='lzf')
+    
+    path_h5 = os.path.join(conf['path_tmp'], 'data.h5')
 
-    tr_set = H5PYDataset(conf['path_h5'], ('train',), sources=('LR', 'HR'),
-                         **kwargs)
+    tr_set = H5PYDataset(path_h5, ('train',), sources=('LR', 'HR'),
+                         load_in_memory=conf['load_in_memory'])
     tr_scheme = ShuffledScheme(examples=tr_set.num_examples,
                                batch_size=FLAGS.num_gpus * conf['mb_size'])
     tr_stream = DataStream(dataset=tr_set, iteration_scheme=tr_scheme)
 
-    te_set = H5PYDataset(conf['path_h5'], ('test',), sources=('LR', 'HR'),
-                         **kwargs)
+    te_set = H5PYDataset(path_h5, ('test',), sources=('LR', 'HR'),
+                         load_in_memory=conf['load_in_memory'])
     te_scheme = SequentialScheme(examples=te_set.num_examples,
                                  batch_size=FLAGS.num_gpus * conf['mb_size'])
     te_stream = DataStream(dataset=te_set, iteration_scheme=te_scheme)
     
-    if 'load_in_memory' in kwargs:
+    if conf['load_in_memory']:
         print("training set: %d mb" % ((tr_set.data_sources[0].nbytes + \
             tr_set.data_sources[1].nbytes) / 1e6))
         print("testing set: %d mb" % ((te_set.data_sources[0].nbytes + \

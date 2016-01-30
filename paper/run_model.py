@@ -12,10 +12,10 @@ import tensorflow as tf
 from utils import preproc, tools
 
 FLAGS = tf.app.flags.FLAGS
-from scn_victor1 import model
+from paper import model
 
 
-def eval_epoch(Xs, Ys, y, sess, stream):
+def eval_epoch(Xs, Ys, y, sess, stream, cropw):
     """
     Evaluate the model against a dataset, and return the PSNR.
 
@@ -25,11 +25,13 @@ def eval_epoch(Xs, Ys, y, sess, stream):
       y: model output tensor
       sess: session
       stream: DataStream for the dataset
+      cropw: crop border
     Returns:
       psnr: PSNR of model's inference on dataset
     """
     se = 0.
     for X_c, y_c in stream.get_epoch_iterator():
+        y_c = y_c[:, cropw:-cropw, cropw:-cropw]
         chunk_size = X_c.shape[0]
         gpu_chunk = chunk_size // FLAGS.num_gpus
         dict_input1 = [(Xs[i], X_c[i*gpu_chunk : \
@@ -58,18 +60,17 @@ def train(conf, ckpt=None):
       conf: configuration dictionary
       ckpt: restore from ckpt
     """
-    path_tmp = conf['path_tmp']
-    data_cached = conf['data_cached']
+    cropw = conf['cropw']
     mb_size = conf['mb_size']
+    path_tmp = conf['path_tmp']
     n_epochs = conf['n_epochs']
     cw = conf['cw']
     grad_norm_thresh = conf['grad_norm_thresh']
-    
-    if not data_cached:
-        tools.reset_tmp(path_tmp)
+
+    tools.reset_tmp(path_tmp)
 
     # Prepare data
-    tr_stream, te_stream = tools.prepare_data(conf, load_in_memory=True)
+    tr_stream, te_stream = tools.prepare_data(conf)
     n_tr = tr_stream.dataset.num_examples
     n_te = te_stream.dataset.num_examples
 
@@ -86,7 +87,8 @@ def train(conf, ckpt=None):
         # Placeholders
         Xs = [tf.placeholder(tf.float32, [None, cw, cw, 1], name='X_%02d' % i) \
               for i in range(FLAGS.num_gpus)]
-        Ys = [tf.placeholder(tf.float32, [None, cw, cw, 1], name='Y_%02d' % i) \
+        Ys = [tf.placeholder(tf.float32, [None, cw - 2*cropw, cw - 2*cropw, 1],
+                             name='Y_%02d' % i) \
               for i in range(FLAGS.num_gpus)]
 
         # Calculate the gradients for each model tower
@@ -136,12 +138,13 @@ def train(conf, ckpt=None):
                 summs.append(tf.histogram_summary(v_name + '/gradients', g))
 
         # Tensorflow boilerplate
-        sess, saver, summ_writer, summ_op, err_sum_op, psnr_tr_t, psnr_te_t = \
-            tools.tf_boilerplate(summs, conf, ckpt)
+        sess, saver, summ_writer, summ_op = tools.tf_boilerplate(summs, conf, ckpt)
 
         # Baseline error
-        bpsnr = tools.baseline_psnr(te_stream)
-        print('approx baseline psnr=%.3f' % bpsnr)
+        bpsnr_tr = tools.baseline_psnr(tr_stream)
+        bpsnr_te = tools.baseline_psnr(te_stream)
+        print('approx baseline psnr_tr=%.3f' % bpsnr_tr)
+        print('approx baseline psnr_te=%.3f' % bpsnr_te)
 
         # Train
         format_str = ('%s| %04d PSNR=%.3f (Tr: %.1fex/s; %.1fs/batch)'
@@ -151,6 +154,7 @@ def train(conf, ckpt=None):
             print('--- Epoch %d ---' % epoch)
             # Training
             for X_c, y_c in tr_stream.get_epoch_iterator():
+                y_c = y_c[:, cropw:-cropw, cropw:-cropw]
                 chunk_size = X_c.shape[0]
                 gpu_chunk = chunk_size // FLAGS.num_gpus
                 dict_input1 = [(Xs[i], X_c[i*gpu_chunk : \
@@ -194,13 +198,10 @@ def train(conf, ckpt=None):
                 step += 1
 
             # Evaluation
-            psnr_tr = eval_epoch(Xs, Ys, y, sess, tr_stream)
-            psnr_te = eval_epoch(Xs, Ys, y, sess, te_stream)
+            psnr_tr = eval_epoch(Xs, Ys, y, sess, tr_stream, cropw)
+            psnr_te = eval_epoch(Xs, Ys, y, sess, te_stream, cropw)
             print('approx psnr_tr=%.3f' % psnr_tr)
             print('approx psnr_te=%.3f' % psnr_te)
-            summ_str = sess.run(err_sum_op, feed_dict={psnr_tr_t: psnr_tr,
-                                                       psnr_te_t: psnr_te})
-            summ_writer.add_summary(summ_str, epoch)
             saver.save(sess, os.path.join(path_tmp, 'ckpt'),
                        global_step=step)            
 
@@ -224,11 +225,11 @@ def infer(img, Xs, y, sess, conf, save=None):
     Returns:
       hr: inferred image
     """
-    # Relevant parameters
     cw = conf['cw']
     stride = cw // 2
     mb_size = conf['mb_size']
     path_tmp = conf['path_tmp']
+    cropw = conf['cropw']
 
     # Bi-cubic up-sample and pre-process
     start_time0 = time.time()
@@ -239,43 +240,50 @@ def infer(img, Xs, y, sess, conf, save=None):
     h1, w1 = lr_y.shape
 
     # Fill into a data array
-    n = preproc._num_crops(lr_y, cw, stride)
-    crops_in = np.empty((n, cw, cw, 1), dtype='float32')
+    n_y, n_x = preproc._num_crops(lr_y, cw, stride, tup=True)
+    crops_in = np.empty((n_y*n_x, cw, cw, 1), dtype='float32')
     for i, crop in enumerate(preproc._crop_gen(lr_y, cw, stride)):
         crops_in[i] = crop[..., np.newaxis]
 
     # Infer
-    crops_out = np.empty_like(crops_in, dtype='float32')
+    crops_out = np.empty((n_y*n_x, cw - 2*cropw, cw - 2*cropw, 1), dtype='float32')
     start_time1 = time.time()
-    for i in range(0, n, FLAGS.num_gpus * mb_size):
+    for i in range(0, n_y*n_x, FLAGS.num_gpus * mb_size):
         X_c = crops_in[i : i + FLAGS.num_gpus * mb_size]
-        chunk_size = X_c.shape[0]
+        chunk_size= X_c.shape[0]
         gpu_chunk = chunk_size // FLAGS.num_gpus
-        dict_input1 = [(Xs[i], X_c[i*gpu_chunk : \
-                                   ((i + 1)*gpu_chunk) \
-                                   if (i != FLAGS.num_gpus - 1) \
+        dict_input1 = [(Xs[j], X_c[j*gpu_chunk : \
+                                   ((j + 1)*gpu_chunk) \
+                                   if (j != FLAGS.num_gpus - 1) \
                                    else chunk_size]) \
-                       for i in range(FLAGS.num_gpus)]
+                       for j in range(FLAGS.num_gpus)]
         feed = dict(dict_input1)
-        crops_out[i : i + FLAGS.num_gpus * mb_size] = sess.run(y, feed_dict=feed)
+        tmp = sess.run(y, feed_dict=feed)
+        crops_out[i : i + FLAGS.num_gpus * mb_size] = tmp
     gpu_time = time.time() - start_time1
     
     # Fill crops into y channel
-    hr_y = np.zeros_like(lr_y, dtype='float32')
+    h2 = cw-2*cropw + (n_y - 1)*stride
+    w2 = cw-2*cropw + (n_x - 1)*stride
+    hr_y = np.zeros((h2, w2), dtype='float32')
     mask = 1e-8 * np.ones_like(hr_y, dtype='float32')
-    i = 0
-    for y in range(0, h1 - cw + 1, stride):
-        for x in range(0, w1 - cw + 1, stride):
-            hr_y[y : y + cw, x : x + cw] += crops_out[i, :, :, 0]
-            mask[y : y + cw, x : x + cw] += np.ones_like(crops_out[i, :, :, 0],
-                                                         dtype='float32')
-            i += 1
+    
+    y = 0
+    for i in range(n_y):
+        x = 0
+        for j in range(n_x):
+            hr_y[y : y + cw-2*cropw, x : x + cw-2*cropw] += \
+                crops_out[i*n_x + j, :, :, 0]
+            mask[y : y + cw-2*cropw, x : x + cw-2*cropw] += 1.
+            x += stride
+        y += stride
+    
     hr_y /= mask
-    hr_y = hr_y[:h0, :w0]
     hr_y = preproc.unit2byte(hr_y)
 
     # Combine y with cb & cr, then convert to rgb
-    hr_ycc = lr_ycc
+    hr_y = hr_y[:h0 - 2*cropw, :w0 - 2*cropw]
+    hr_ycc = lr_ycc[cropw:-cropw, cropw:-cropw]
     hr_ycc[:, :, 0] = hr_y
     hr = preproc.ycc2rgb(hr_ycc)
     total_time = time.time() - start_time0
@@ -299,8 +307,10 @@ def eval_te(conf, ckpt):
     Returns:
       psnr: psnr of entire test set
     """
-    sr = conf['sr']
     path_te = conf['path_te']
+    cw = conf['cw']
+    sr = conf['sr']
+    cropw = conf['cropw']
     fns_te = preproc._get_filenames(path_te)
     n = len(fns_te)
 
@@ -317,20 +327,39 @@ def eval_te(conf, ckpt):
                     y_splits.append(y_split)
                     tf.get_variable_scope().reuse_variables()
         y = tf.concat(0, y_splits, name='y')
+        
+        # Restore
+        saver = tf.train.Saver(tf.trainable_variables())
+        sess = tf.Session(config=tf.ConfigProto(
+            allow_soft_placement=True,
+            log_device_placement=FLAGS.log_device_placement))
+        saver.restore(sess, ckpt)
 
         # Iterate over each image, and calculate error
         tmse = 0
+        bl_tmse = 0
         for fn in fns_te:
-            lr, gt = preproc.lr_hr(sm.imread(fn), float(sr))
-            hr = infer(lr, Xs, y, conf)
+            lr, gt = preproc.lr_hr(sm.imread(fn), sr)
+            hr = infer(lr, Xs, y, sess, conf)
             # Evaluate
-            gt = gt[:hr.shape[0], :hr.shape[1]]
-            diff = (gt - hr).astype('float32')
+            gt = gt[cropw:-cropw, cropw:-cropw]
+            diff = gt.astype(np.float32) - hr.astype(np.float32)
             mse = np.mean(diff ** 2)
             tmse += mse
             psnr = 20 * np.log10(255.0 / np.sqrt(mse))
-            print('PSNR: %.3f for %s' % (psnr, save if save else 'img'))
+            
+            lr = lr[cropw:-cropw, cropw:-cropw]
+            bl_diff = gt.astype(np.float32) - lr.astype(np.float32)
+            bl_mse = np.mean(bl_diff ** 2)
+            bl_tmse += bl_mse
+            bl_psnr = 20 * np.log10(255.0 / np.sqrt(bl_mse))
+            
+            print('hr PSNR: %.3f, lr PSNR % .3f for %s' % \
+                (psnr, bl_psnr, fn.split('/')[-1]))
         rmse = np.sqrt(tmse / n)
         psnr = 20 * np.log10(255. / rmse)
+        bl_rmse = np.sqrt(bl_tmse / n)
+        bl_psnr = 20 * np.log10(255. / bl_rmse)
         print('total test PSNR: %.3f' % psnr)
-        return psnr
+        print('total baseline PSNR: %.3f' % bl_psnr)
+        return psnr, bl_psnr
