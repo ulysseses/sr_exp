@@ -1,5 +1,5 @@
 # store_hdf5
-path_tmp: tmp/paper
+path_tmp: tmp/paper/test3
 path_tr: data/Yang
 path_te: data/Set14
 path_va: data/Set5
@@ -15,12 +15,12 @@ data_cached: false
 # inference
 fw: 5
 pw: 5
-ps: ####################
+ps: 1 ##########
 n_chans: 4
 n_c: 256
 T: 3
 cropw: 3
-res: ####################
+res: true ##########
 mw: 7
 thresh0: 9.E-3
 subnet_name: lista

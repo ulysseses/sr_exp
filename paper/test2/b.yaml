@@ -1,5 +1,5 @@
 # store_hdf5
-path_tmp: tmp/paper
+path_tmp: tmp/paper/test2
 path_tr: data/Yang
 path_te: data/Set14
 path_va: data/Set5
@@ -20,7 +20,7 @@ n_chans: 4
 n_c: 256
 T: 3
 cropw: 3
-res: ####################
+res: true ##########
 mw: 7
 thresh0: 9.E-3
 subnet_name: lista
@@ -29,11 +29,11 @@ low_rank: -1
 
 # training
 load_in_memory: true
-mb_size: 32
-n_epochs: 6
+mb_size: 64
+n_epochs: 12
 l1_reg: 0
 l2_reg: 1.E-5
 lr0: 1.E-3
-n_epochs_per_decay: 2
+n_epochs_per_decay: 4
 lr_decay_factor: 0.1
 grad_norm_thresh: 50

@@ -250,7 +250,16 @@ def infer(img, Xs, y, sess, conf, save=None):
     start_time1 = time.time()
     for i in range(0, n_y*n_x, FLAGS.num_gpus * mb_size):
         X_c = crops_in[i : i + FLAGS.num_gpus * mb_size]
-        chunk_size= X_c.shape[0]
+        chunk_size0 = X_c.shape[0]
+        
+        # Handle chunks that are less than number of gpu's
+        chunk_size = chunk_size0
+        if chunk_size < FLAGS.num_gpus:
+            num_repeats = FLAGS.num_gpus - chunk_size + 1
+            repeats = [1 for _ in range(chunk_size-1)] + [num_repeats]
+            X_c = np.repeat(X_c, repeats, axis=0)
+            chunk_size = FLAGS.num_gpus
+            
         gpu_chunk = chunk_size // FLAGS.num_gpus
         dict_input1 = [(Xs[j], X_c[j*gpu_chunk : \
                                    ((j + 1)*gpu_chunk) \
@@ -259,7 +268,7 @@ def infer(img, Xs, y, sess, conf, save=None):
                        for j in range(FLAGS.num_gpus)]
         feed = dict(dict_input1)
         tmp = sess.run(y, feed_dict=feed)
-        crops_out[i : i + FLAGS.num_gpus * mb_size] = tmp
+        crops_out[i : i + FLAGS.num_gpus * mb_size] = tmp[:chunk_size0]
     gpu_time = time.time() - start_time1
     
     # Fill crops into y channel

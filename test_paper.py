@@ -25,12 +25,13 @@ def infer(path):
     ckpt = tf.train.get_checkpoint_state(conf['path_tmp'])
     if ckpt:
         ckpt = ckpt.model_checkpoint_path
+        print('found ckpt: %s' % ckpt)
     run_model.eval_te(conf, ckpt)
 
 
 if __name__ == '__main__':
     command = 'tr'
-    path = 'paper/test1/a.yaml'
+    path = 'paper/test3/a.yaml'
     if command[:2].lower() == 'tr':
         train(path)
     elif command[:2].lower() == 'in':
