@@ -3,8 +3,8 @@ path_tmp: tmp/paper
 path_tr: data/Yang
 path_te: data/Set14
 path_va: data/Set5
-cw: 56
-stride: 49
+cw: 41
+stride: 34
 sr: 2
 augment: true
 prune: 0.0
@@ -29,7 +29,7 @@ low_rank: -1
 
 # training
 load_in_memory: true
-mb_size: 32
+mb_size: 64
 n_epochs: 6
 l1_reg: 0
 l2_reg: 1.E-5

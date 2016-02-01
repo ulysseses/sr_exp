@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 import sys
 import yaml
 from paper import run_model
@@ -30,11 +29,11 @@ def infer(path):
 
 
 if __name__ == '__main__':
-    command = sys.argv[0]
-    path = sys.argv[1]
-    if command[2:].lower() == 'tr':
+    command = 'tr'
+    path = 'paper/test1/a.yaml'
+    if command[:2].lower() == 'tr':
         train(path)
-    elif command[2:].lower() == 'in':
+    elif command[:2].lower() == 'in':
         infer(path)
     else:
         raise ValueError('command %s not recognized' % command)

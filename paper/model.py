@@ -81,19 +81,17 @@ def _arr_initializer(arr):
     return _initializer
 
 
-def _st(x, name='st'):
+def _st(x, thresh, name='st'):
     """
     L1 Soft threshold operator.
 
     Args:
       x: input
+      thresh: threshold variable
       name: name assigned to this operation
     Returns:
       soft threshold of `x`
     """
-    prox_vars = tf.get_collection('prox_vars')
-    assert len(prox_vars) == 1
-    thresh = prox_vars[0]
     with tf.name_scope('st'):
         return tf.mul(tf.sign(x), tf.nn.relu(tf.nn.bias_add(tf.abs(x), -thresh)))
 
@@ -128,23 +126,19 @@ def _gst_init(l, p, J=2):
     return tau0, slope0
 
 
-def _gst(x, name='gst'):
+def _gst(x, tau, slope, name='gst'):
     """
     Learnable and approximate form of GST, with modifiable slope in addition to the
     modifiable thresh.
 
     Args:
       x: input
+      tau: tau variable
+      slope: slope variable
       name: name assigned to this operation
     Returns:
       generalized soft threshold of `x`
     """
-    prox_vars = tf.get_collection('prox_vars')
-    assert len(prox_vars) == 2
-    if prox_vars[0].op.name.split('/')[-1][:3] == 'tau':
-        tau, slope = prox_vars
-    else:
-        slope, tau = prox_vars
     with tf.name_scope(name):
         return tf.mul(tf.sign(x),
                       tf.select(tf.less(tf.abs(x), thresh),
@@ -152,7 +146,7 @@ def _gst(x, name='gst'):
                       tf.nn.bias_add(tf.mul(slope, tf.abs(x)), thresh)))
 
 
-def _lista(x, w_e, w_s, prox_op, T):
+def _lista(x, w_e, w_s, prox_op, T, *prox_vars):
     """
     Learned Iterative Shrinkage-Thresholding Algorithm (LISTA). LISTA is an
     approximately sparse encoder. It approximates (in an L2 sense) a sparse code
@@ -167,20 +161,21 @@ def _lista(x, w_e, w_s, prox_op, T):
       w_s: [n_c, n_f] mutual inhibition tensor
       prox_op: proximal operator
       T: number of iterations
+      prox_vars: variables passed to prox_op
     Returns:
       z: LISTA output
     """
     b = tf.matmul(x, w_e, name='b')
     with tf.name_scope('itr_00'):
-        z = prox_op(b, name='z')
+        z = prox_op(b, *prox_vars, name='z')
     for t in range(1, T+1):
         with tf.name_scope('itr_%02d' % t):
             c = b + tf.matmul(z, w_s, name='c')
-            z = prox_op(c, name='z')
+            z = prox_op(c, *prox_vars, name='z')
     return z
 
 
-def _lcod(x, w_e, w_s, prox_op, T):
+def _lcod(x, w_e, w_s, prox_op, T, *prox_vars):
     """
     Learned Coordinate Descent (LCoD). LCoD is an approximately sparse encoder. It
     approximates (in an L2 sense) a sparse code of `x` according to dictionary `w_e`.
@@ -195,6 +190,7 @@ def _lcod(x, w_e, w_s, prox_op, T):
       w_s: [n_c, n_f] mutual inhibition tensor
       prox_op: proximal operator
       T: number of iterations
+      prox_vars: variables passed to prox_op
     Returns:
       z: LCoD output
     """
@@ -244,7 +240,7 @@ def _lcod(x, w_e, w_s, prox_op, T):
     for t in range(1, T+1):
         with tf.name_scope('itr_%02d' % t):
             if t != T:
-                z_bar = prox_op(b, name='z_bar')  # [n, n_c]
+                z_bar = prox_op(b, *prox_vars, name='z_bar')  # [n, n_c]
                 # L1 norm greedy heuristic
                 with tf.name_scope('greedy_heuristic'):
                     tmp = z_bar - z  # [n, n_c]
@@ -269,7 +265,7 @@ def _lcod(x, w_e, w_s, prox_op, T):
                     forget_z, update_z = tup
                     z = tf.add_n([z, -forget_z, update_z], name='z')  # [n, n_c]
             else:
-                z = prox_op(b, thresh, name='z')
+                z = prox_op(b, *prox_vars, name='z')
     return z
 
 
@@ -304,7 +300,7 @@ def inference(x, conf):
     prox_name = conf['prox_name'].lower()
     low_rank = conf['low_rank']
     
-    n_f = pw*pw*n_chans
+    n_f = n_chans*pw*pw
 
     # Determine subnet and proximal operators
     if subnet_name == 'lista':
@@ -315,6 +311,7 @@ def inference(x, conf):
         raise ValueError('subnet_name must be "lista" or "lcod"')
 
     # Determine proximal operator
+    prox_vars = []
     with tf.device('/cpu:0' if FLAGS.dev_assign else None):
         if prox_name == 'st':
             prox_op = _st
@@ -322,7 +319,7 @@ def inference(x, conf):
                 [n_c],
                 dtype=tf.float32,
                 initializer=tf.constant_initializer(thresh0))
-            tf.add_to_collection('prox_vars', thresh)
+            prox_vars.append(thresh)
         elif prox_name == 'gst':
             prox_op = _gst
             p = conf['p']
@@ -335,11 +332,11 @@ def inference(x, conf):
                 [n_c],
                 dtype=tf.float32,
                 initializer=tf.constant_initializer(slope0))
-            tf.add_to_collection('prox_vars', tau)
-            tf.add_to_collection('prox_vars', slope)
+            prox_vars.append(tau)
+            prox_vars.append(slope)
         else:
             raise ValueError('prox_name must be "st" or "gst"')
-    for prox_var in tf.get_collection('prox_vars'):
+    for prox_var in prox_vars:
         name = re.sub('%s_[0-9]*/' % FLAGS.tower_name, '', prox_var.op.name)
         tf.histogram_summary(name, prox_var)
 
@@ -356,33 +353,37 @@ def inference(x, conf):
         w_shift2 = tf.constant(_init_shift(1, pw), name='w_shift2')
         w_stitch = tf.constant(_init_stitch(pw), name='w_stitch')
         w_mean = tf.constant(_init_mean(mw), name='w_mean')
-
-    # Feature Extraction
+    
+    # Initialize feature extraction filters
     with tf.device('/cpu:0' if FLAGS.dev_assign else None):
         w_conv = tf.get_variable('w_conv', [fw, fw, 1, n_chans], tf.float32,
             initializer=tf.truncated_normal_initializer(0., _relu_std(fw, 1)))
     tf.add_to_collection('decay_vars', w_conv)
     name = re.sub('%s_[0-9]*/' % FLAGS.tower_name, '', w_conv.op.name)
     tf.histogram_summary(name, w_conv)
-
+    
+    # Feature Extraction
+    # [bs, h, w, 1] -> [bs, h, w, n_chans]
     x_conv = tf.nn.conv2d(x, w_conv, [1, 1, 1, 1], 'SAME', name='x_conv')
+
+    if not res:
+        # Normalize each patch
+        # [bs, h, w, n_chans] -> [bs, h, w, n_chans]
+        x_b4_shift = tf.nn.l2_normalize(x_conv, 3, name='x_normed')
+    else:
+        # Residual training; don't need normalization
+        x_b4_shift = x_conv
 
     # Shift with pw*pw dirac delta filters to create overlapping patches.
     # Only obtain patches every `ps` strides.
     # A patch is resembled as the flattened array along the last dimension.
-    # [bs, h, w, n_f] --> [bs, h // ps, w // ps, n_f*pw*pw]
-    x_shift1 = tf.nn.depthwise_conv2d(x_conv, w_shift1, [1, ps, ps, 1], 'SAME',
-        name='x_shift1')
-
-    if not res:
-        # normalize each patch
-        x_in = tf.nn.l2_normalize(x_shift1, 3, name='x_in')
-    else:
-        # residual training doesn't need normalization
-        x_in = tf.identity(x_shift1, name='x_in')
-
-    # 4D tensor --> matrix
-    x_in = tf.reshape(x_in, [-1, n_f])
+    # [bs, h, w, n_chans] --> [bs, h//ps, w//ps, n_chans*pw*pw]
+    x_shift = tf.nn.depthwise_conv2d(x_b4_shift, w_shift1, [1, ps, ps, 1], 'SAME',
+        name='x_shift')
+    
+    # 4D tensor -> matrix
+    # [bs, h//ps, w//ps, n_chans*pw*pw] -> [bs*(h//ps)*(w//ps), n_chans*pw*pw]
+    x_in = tf.reshape(x_shift, [-1, n_f], name='x_in')
 
     # Feed into sub-network
     with tf.variable_scope(subnet_name):
@@ -423,15 +424,17 @@ def inference(x, conf):
                     initializer=_arr_initializer(s))
             # Decoder
             w_d = tf.get_variable('w_d',
-                [n_c, n_f],
+                [n_c, pw*pw],
                 dtype=tf.float32,
                 initializer=tf.truncated_normal_initializer(0., _relu_std(1, n_c)))
 
         # Sub-network
-        z = subnet(x_input, w_e, w_s, prox_op, T)
+        # [bs*(h//ps)*(w//ps), n_f] -> [bs*(h//ps)*(w//ps), n_c]
+        z = subnet(x_in, w_e, w_s, prox_op, T, *prox_vars)
         tf.add_to_collection('l1_decay', z)
 
         # Decode
+        # [bs*(h//ps)*(w//ps), n_c] -> [bs*(h//ps)*(w//ps), pw*pw]
         y_out = tf.matmul(z, w_d, name='y_out')
 
         for var in [w_e, w_s, w_d, z]:
@@ -440,7 +443,8 @@ def inference(x, conf):
             tf.add_to_collection('decay_vars', var)
 
     # matrix --> 4D tensor
-    y_out = tf.reshape(y_out, tf.pack([-1, h // ps, w // ps, pw*pw]))
+    # [bs*(h//ps)*(w//ps), pw*pw] -> [bs, h//ps, w//ps, pw*pw]
+    y_out = tf.reshape(y_out, tf.pack([bs, h // ps, w // ps, pw*pw]))
 
     if not res:
         # Obtain the norm for each overlapping patch of x
@@ -451,7 +455,7 @@ def inference(x, conf):
             x_norm = tf.pow(tf.reduce_sum(tf.pow(x_shift2, 2), 3, True), 0.5,
                             name='x_norm')
             y_unit = tf.nn.l2_normalize(y_out, 3, name='y_unit')
-            y_denorm = tf.mul(y_unit, x_norm * scale_norm, name='y_denorm')
+            prev = tf.mul(y_unit, x_norm * scale_norm, name='y_denorm')
     else:
         # Residual training
         prev = y_out
