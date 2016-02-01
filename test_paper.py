@@ -30,8 +30,8 @@ def infer(path):
 
 
 if __name__ == '__main__':
-    command = 'tr'
-    path = 'paper/test3/a.yaml'
+    command = 'in'
+    path = 'paper/test3/b.yaml'
     if command[:2].lower() == 'tr':
         train(path)
     elif command[:2].lower() == 'in':

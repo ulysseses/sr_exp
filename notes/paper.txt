@@ -1,34 +1,35 @@
 1. norm vs res
+  total baseline PSNR: 27.397
   a)
   approx psnr_tr=29.892
   approx psnr_te=28.600
   total test PSNR: 28.361
-  total baseline PSNR: 27.397
   b)
   approx psnr_tr=30.302
   approx psnr_te=29.050
   total test PSNR: 28.721
-  total baseline PSNR: 27.397
+  
 2. stride=1 vs stride=2
   a)
   approx psnr_tr=30.302
   approx psnr_te=29.050
   total test PSNR: 28.721
-  total baseline PSNR: 27.397
   b)
   approx psnr_tr=29.880
   approx psnr_te=28.695
   total test PSNR: 28.465
-  total baseline PSNR: 27.397
+  
 3. S vs S = UV
   a)
-  approx psnr_tr=30.302
-  approx psnr_te=29.050
-  total test PSNR: 28.721
-  total baseline PSNR: 27.397
+  approx psnr_tr=30.326
+  approx psnr_te=29.053
+  total test PSNR: 28.731
   b)
-  
+  approx psnr_tr=30.418
+  approx psnr_te=29.105
+  total test PSNR: 28.769
   c)
+  
 4. explicit L1 prior on z
 5. gst vs st
 6. lista vs lcod
