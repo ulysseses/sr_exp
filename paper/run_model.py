@@ -372,3 +372,60 @@ def eval_te(conf, ckpt):
         print('total test PSNR: %.3f' % psnr)
         print('total baseline PSNR: %.3f' % bl_psnr)
         return psnr, bl_psnr
+
+
+def eval_h5(conf, ckpt):
+    """
+    Train model for a number of steps.
+    
+    Args:
+      conf: configuration dictionary
+      ckpt: restore from ckpt
+    """
+    cropw = conf['cropw']
+    mb_size = conf['mb_size']
+    path_tmp = conf['path_tmp']
+    n_epochs = conf['n_epochs']
+    cw = conf['cw']
+    grad_norm_thresh = conf['grad_norm_thresh']
+
+    # Prepare data
+    tr_stream, te_stream = tools.prepare_data(conf)
+    n_tr = tr_stream.dataset.num_examples
+    n_te = te_stream.dataset.num_examples
+
+    with tf.Graph().as_default(), tf.device('/cpu:0' if FLAGS.dev_assign else None):
+        # Placeholders
+        Xs = [tf.placeholder(tf.float32, [None, cw, cw, 1], name='X_%02d' % i) \
+              for i in range(FLAGS.num_gpus)]
+        Ys = [tf.placeholder(tf.float32, [None, cw - 2*cropw, cw - 2*cropw, 1],
+                             name='Y_%02d' % i) \
+              for i in range(FLAGS.num_gpus)]
+
+        # Calculate the gradients for each model tower
+        tower_grads = []
+        y_splits = []
+        for i in range(FLAGS.num_gpus):
+            with tf.device(('/gpu:%d' % i) if FLAGS.dev_assign else None):
+                with tf.name_scope('%s_%02d' % (FLAGS.tower_name, i)) as scope:
+                    # Calculate the loss for one tower. This function constructs
+                    # the entire model but shares the variables across all towers.
+                    y_split = model.inference(Xs[i], conf)
+                    y_splits.append(y_split)
+                    total_loss = model.loss(y_split, Ys[i], conf, scope)
+                    
+                    # Reuse variables for the next tower.
+                    tf.get_variable_scope().reuse_variables()
+
+        y = tf.concat(0, y_splits, name='y')
+
+        # Tensorflow boilerplate
+        sess, saver, summ_writer, summ_op = tools.tf_boilerplate(None, conf, ckpt)
+
+        # Evaluation
+        psnr_tr = eval_epoch(Xs, Ys, y, sess, tr_stream, cropw)
+        psnr_te = eval_epoch(Xs, Ys, y, sess, te_stream, cropw)
+        print('approx psnr_tr=%.3f' % psnr_tr)
+        print('approx psnr_te=%.3f' % psnr_te)
+        tr_stream.close()
+        te_stream.close()

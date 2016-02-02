@@ -3,16 +3,22 @@ I tensorflow/stream_executor/dso_loader.cc:101] successfully opened CUDA library
 I tensorflow/stream_executor/dso_loader.cc:101] successfully opened CUDA library libcufft.so.7.0 locally
 I tensorflow/stream_executor/dso_loader.cc:101] successfully opened CUDA library libcuda.so locally
 I tensorflow/stream_executor/dso_loader.cc:101] successfully opened CUDA library libcurand.so.7.0 locally
-INFO:tensorflow:Created variable thresh:0 with shape (256,) and init <function _initializer at 0x7ffb0fd1bb18>
-INFO:tensorflow:Created variable thresh:0 with shape (256,) and init <function _initializer at 0x7ffb0fd1bb18>
-INFO:tensorflow:Created variable w_conv:0 with shape (5, 5, 1, 4) and init <function _initializer at 0x7ffaa4536668>
-INFO:tensorflow:Created variable w_conv:0 with shape (5, 5, 1, 4) and init <function _initializer at 0x7ffaa4536668>
-INFO:tensorflow:Created variable lista/w_e:0 with shape (100, 256) and init <function _initializer at 0x7ffaa4536668>
-INFO:tensorflow:Created variable lista/w_e:0 with shape (100, 256) and init <function _initializer at 0x7ffaa4536668>
-INFO:tensorflow:Created variable lista/w_s:0 with shape (256, 256) and init <function _initializer at 0x7ffaa4536668>
-INFO:tensorflow:Created variable lista/w_s:0 with shape (256, 256) and init <function _initializer at 0x7ffaa4536668>
-INFO:tensorflow:Created variable lista/w_d:0 with shape (256, 25) and init <function _initializer at 0x7ffaa4536668>
-INFO:tensorflow:Created variable lista/w_d:0 with shape (256, 25) and init <function _initializer at 0x7ffaa4536668>
+INFO:tensorflow:Created variable tau:0 with shape (256,) and init <function _initializer at 0x7f2d33736b18>
+INFO:tensorflow:Created variable tau:0 with shape (256,) and init <function _initializer at 0x7f2d33736b18>
+INFO:tensorflow:Created variable y_intercept:0 with shape (256,) and init <function _initializer at 0x7f2d33736b18>
+INFO:tensorflow:Created variable y_intercept:0 with shape (256,) and init <function _initializer at 0x7f2d33736b18>
+INFO:tensorflow:Created variable slope:0 with shape (256,) and init <function _initializer at 0x7f2d33736b18>
+INFO:tensorflow:Created variable slope:0 with shape (256,) and init <function _initializer at 0x7f2d33736b18>
+INFO:tensorflow:Created variable w_conv:0 with shape (5, 5, 1, 4) and init <function _initializer at 0x7f2ca9fe8b18>
+INFO:tensorflow:Created variable w_conv:0 with shape (5, 5, 1, 4) and init <function _initializer at 0x7f2ca9fe8b18>
+INFO:tensorflow:Created variable lista/w_e:0 with shape (100, 256) and init <function _initializer at 0x7f2ca9fe8b18>
+INFO:tensorflow:Created variable lista/w_e:0 with shape (100, 256) and init <function _initializer at 0x7f2ca9fe8b18>
+INFO:tensorflow:Created variable lista/w_s1:0 with shape (256, 96) and init <function _initializer at 0x7f2ca9fe8b18>
+INFO:tensorflow:Created variable lista/w_s1:0 with shape (256, 96) and init <function _initializer at 0x7f2ca9fe8b18>
+INFO:tensorflow:Created variable lista/w_s2:0 with shape (96, 256) and init <function _initializer at 0x7f2ca9fe8b18>
+INFO:tensorflow:Created variable lista/w_s2:0 with shape (96, 256) and init <function _initializer at 0x7f2ca9fe8b18>
+INFO:tensorflow:Created variable lista/w_d:0 with shape (256, 25) and init <function _initializer at 0x7f2ca9fe8b18>
+INFO:tensorflow:Created variable lista/w_d:0 with shape (256, 25) and init <function _initializer at 0x7f2ca9fe8b18>
 I tensorflow/core/common_runtime/local_device.cc:40] Local device intra op parallelism threads: 32
 I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:909] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
 I tensorflow/core/common_runtime/gpu/gpu_init.cc:103] Found device 0 with properties: 
@@ -164,34 +170,63 @@ I tensorflow/core/common_runtime/gpu/gpu_bfc_allocator.cc:66] Creating bin of ma
 I tensorflow/core/common_runtime/gpu/gpu_bfc_allocator.cc:66] Creating bin of max chunk size 2.00GiB
 I tensorflow/core/common_runtime/gpu/gpu_bfc_allocator.cc:66] Creating bin of max chunk size 4.00GiB
 I tensorflow/core/common_runtime/direct_session.cc:61] Direct session inter op parallelism threads: 32
-found ckpt: tmp/paper/test1/a/ckpt-459
-total time: 1.4 | gpu time: 1.3
-hr PSNR: 32.633, lr PSNR  32.194 for img_012_SRF_4_HR.png
-total time: 0.6 | gpu time: 0.5
-hr PSNR: 26.880, lr PSNR  26.415 for img_002_SRF_4_HR.png
-total time: 0.4 | gpu time: 0.3
-hr PSNR: 27.465, lr PSNR  26.600 for img_003_SRF_4_HR.png
-total time: 0.6 | gpu time: 0.5
-hr PSNR: 33.432, lr PSNR  31.460 for img_011_SRF_4_HR.png
-total time: 0.2 | gpu time: 0.2
-hr PSNR: 29.529, lr PSNR  28.385 for img_007_SRF_4_HR.png
-total time: 0.4 | gpu time: 0.3
-hr PSNR: 28.718, lr PSNR  27.872 for img_010_SRF_4_HR.png
+INFO:tensorflow:Created variable tau:0 with shape (256,) and init <function _initializer at 0x7f2caadd2848>
+INFO:tensorflow:Created variable tau:0 with shape (256,) and init <function _initializer at 0x7f2caadd2848>
+INFO:tensorflow:Created variable y_intercept:0 with shape (256,) and init <function _initializer at 0x7f2caadd2848>
+INFO:tensorflow:Created variable y_intercept:0 with shape (256,) and init <function _initializer at 0x7f2caadd2848>
+INFO:tensorflow:Created variable slope:0 with shape (256,) and init <function _initializer at 0x7f2caadd2848>
+INFO:tensorflow:Created variable slope:0 with shape (256,) and init <function _initializer at 0x7f2caadd2848>
+INFO:tensorflow:Created variable w_conv:0 with shape (5, 5, 1, 4) and init <function _initializer at 0x7f2caadd2b18>
+INFO:tensorflow:Created variable w_conv:0 with shape (5, 5, 1, 4) and init <function _initializer at 0x7f2caadd2b18>
+INFO:tensorflow:Created variable lista/w_e:0 with shape (100, 256) and init <function _initializer at 0x7f2caadd2b18>
+INFO:tensorflow:Created variable lista/w_e:0 with shape (100, 256) and init <function _initializer at 0x7f2caadd2b18>
+INFO:tensorflow:Created variable lista/w_s1:0 with shape (256, 96) and init <function _initializer at 0x7f2caadd2b18>
+INFO:tensorflow:Created variable lista/w_s1:0 with shape (256, 96) and init <function _initializer at 0x7f2caadd2b18>
+INFO:tensorflow:Created variable lista/w_s2:0 with shape (96, 256) and init <function _initializer at 0x7f2caadd2b18>
+INFO:tensorflow:Created variable lista/w_s2:0 with shape (96, 256) and init <function _initializer at 0x7f2caadd2b18>
+INFO:tensorflow:Created variable lista/w_d:0 with shape (256, 25) and init <function _initializer at 0x7f2caadd2b18>
+INFO:tensorflow:Created variable lista/w_d:0 with shape (256, 25) and init <function _initializer at 0x7f2caadd2b18>
+I tensorflow/core/common_runtime/gpu/gpu_device.cc:702] Creating TensorFlow device (/gpu:0) -> (device: 0, name: GRID K520, pci bus id: 0000:00:03.0)
+I tensorflow/core/common_runtime/gpu/gpu_device.cc:702] Creating TensorFlow device (/gpu:1) -> (device: 1, name: GRID K520, pci bus id: 0000:00:04.0)
+I tensorflow/core/common_runtime/gpu/gpu_device.cc:702] Creating TensorFlow device (/gpu:2) -> (device: 2, name: GRID K520, pci bus id: 0000:00:05.0)
+I tensorflow/core/common_runtime/gpu/gpu_device.cc:702] Creating TensorFlow device (/gpu:3) -> (device: 3, name: GRID K520, pci bus id: 0000:00:06.0)
+found ckpt: tmp/paper/test5/b/ckpt-459
+caching data...
+n_tr: 6416
+n_te: 1168
+n_va: 190
+total caching time: 0.0 min
+training set: 160 mb
+testing set: 29 mb
+approx psnr_tr=30.140
+approx psnr_te=28.846
+total time: 0.5 | gpu time: 0.5
+hr PSNR: 32.843, lr PSNR  32.194 for img_012_SRF_4_HR.png
+total time: 0.7 | gpu time: 0.7
+hr PSNR: 26.923, lr PSNR  26.415 for img_002_SRF_4_HR.png
+total time: 0.5 | gpu time: 0.5
+hr PSNR: 27.606, lr PSNR  26.600 for img_003_SRF_4_HR.png
+total time: 0.7 | gpu time: 0.7
+hr PSNR: 34.223, lr PSNR  31.460 for img_011_SRF_4_HR.png
 total time: 0.3 | gpu time: 0.3
-hr PSNR: 30.917, lr PSNR  29.200 for img_014_SRF_4_HR.png
-total time: 0.4 | gpu time: 0.3
-hr PSNR: 33.046, lr PSNR  32.309 for img_009_SRF_4_HR.png
+hr PSNR: 29.770, lr PSNR  28.385 for img_007_SRF_4_HR.png
+total time: 0.5 | gpu time: 0.5
+hr PSNR: 29.102, lr PSNR  27.872 for img_010_SRF_4_HR.png
+total time: 0.4 | gpu time: 0.4
+hr PSNR: 31.583, lr PSNR  29.200 for img_014_SRF_4_HR.png
+total time: 0.5 | gpu time: 0.5
+hr PSNR: 33.121, lr PSNR  32.309 for img_009_SRF_4_HR.png
 total time: 0.2 | gpu time: 0.2
-hr PSNR: 34.512, lr PSNR  33.289 for img_008_SRF_4_HR.png
-total time: 0.5 | gpu time: 0.4
-hr PSNR: 26.212, lr PSNR  25.167 for img_013_SRF_4_HR.png
-total time: 0.3 | gpu time: 0.3
-hr PSNR: 23.127, lr PSNR  22.686 for img_001_SRF_4_HR.png
+hr PSNR: 35.583, lr PSNR  33.289 for img_008_SRF_4_HR.png
+total time: 0.6 | gpu time: 0.6
+hr PSNR: 27.263, lr PSNR  25.167 for img_013_SRF_4_HR.png
+total time: 0.4 | gpu time: 0.4
+hr PSNR: 23.173, lr PSNR  22.686 for img_001_SRF_4_HR.png
 total time: 0.2 | gpu time: 0.2
-hr PSNR: 28.981, lr PSNR  27.930 for img_004_SRF_4_HR.png
+hr PSNR: 29.071, lr PSNR  27.930 for img_004_SRF_4_HR.png
+total time: 0.2 | gpu time: 0.2
+hr PSNR: 26.105, lr PSNR  24.442 for img_005_SRF_4_HR.png
 total time: 0.1 | gpu time: 0.1
-hr PSNR: 25.700, lr PSNR  24.442 for img_005_SRF_4_HR.png
-total time: 0.1 | gpu time: 0.1
-hr PSNR: 31.668, lr PSNR  31.396 for img_006_SRF_4_HR.png
-total test PSNR: 28.269
+hr PSNR: 31.650, lr PSNR  31.396 for img_006_SRF_4_HR.png
+total test PSNR: 28.566
 total baseline PSNR: 27.397

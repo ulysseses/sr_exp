@@ -107,7 +107,8 @@ def _gst_init(l, p, J=2):
       p: non-convexity (0 <= p)
       J: number of GST iterations to run
     Returns:
-      tau0: initial intercept value
+      tau0: initial x-intercept value
+      y0: initial y-intercept value
       slope0: initial gst slope value
     """
     def actual_gst(y):
@@ -121,19 +122,21 @@ def _gst_init(l, p, J=2):
         return np.sign(y) * x
 
     tau0 = (2*l*(1-p))**(1/(2-p)) + l*p*((2*l*(1-p))**((p-1)/(2-p)))
+    y0 = actual_gst(tau0 + 1e-4)
     slope0 = actual_gst(tau0 + 2) - actual_gst(tau0 + 1)
 
-    return tau0, slope0
+    return tau0, y0, slope0
 
 
-def _gst(x, tau, slope, name='gst'):
+def _gst(x, tau, y, slope, name='gst'):
     """
     Learnable and approximate form of GST, with modifiable slope in addition to the
-    modifiable thresh.
+    modifiable tau.
 
     Args:
       x: input
       tau: tau variable
+      y: y-intercept variable
       slope: slope variable
       name: name assigned to this operation
     Returns:
@@ -141,9 +144,9 @@ def _gst(x, tau, slope, name='gst'):
     """
     with tf.name_scope(name):
         return tf.mul(tf.sign(x),
-                      tf.select(tf.less(tf.abs(x), thresh),
+                      tf.select(tf.less(tf.abs(x), tau),
                       tf.zeros_like(x, dtype=tf.float32),
-                      tf.nn.bias_add(tf.mul(slope, tf.abs(x)), thresh)))
+                      tf.nn.bias_add(tf.mul(slope, tf.abs(x)), y)))
 
 
 def _lista(x, w_e, w_s, prox_op, T, *prox_vars):
@@ -250,7 +253,7 @@ def _lcod(x, w_e, w_s, prox_op, T, *prox_vars):
                     e = tf.slice(tmp, tf.pack([0, k]), tf.pack([n, 1]),
                                  name='e')  # [n, 1]
                 with tf.name_scope('update_b'):
-                    s_slice = tf.slice(w_s, tf.pack([k, 0]), [1, n_c],
+                    s_slice = tf.slice(w_s, tf.pack([k, 0]), tf.pack([1, n_c]),
                                        name='s_slice')  # [1, n_c]
                     b = tf.add(b, tf.matmul(e, s_slice), name='b')  # [n, n_c]
                 with tf.name_scope('update_z'):
@@ -323,16 +326,21 @@ def inference(x, conf):
         elif prox_name == 'gst':
             prox_op = _gst
             p = conf['p']
-            tau0, slope0 = _gst_init(thresh0, p)
+            tau0, y0, slope0 = _gst_init(thresh0, p)
             tau = tf.get_variable('tau',
                 [n_c],
                 dtype=tf.float32,
                 initializer=tf.constant_initializer(tau0))
+            y_intercept = tf.get_variable('y_intercept',
+                [n_c],
+                dtype=tf.float32,
+                initializer=tf.constant_initializer(y0))
             slope = tf.get_variable('slope',
                 [n_c],
                 dtype=tf.float32,
                 initializer=tf.constant_initializer(slope0))
             prox_vars.append(tau)
+            prox_vars.append(y_intercept)
             prox_vars.append(slope)
         else:
             raise ValueError('prox_name must be "st" or "gst"')

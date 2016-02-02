@@ -33,6 +33,8 @@ def infer(path):
         ckpt = ckpt.model_checkpoint_path
         print('found ckpt: %s' % ckpt)
         time.sleep(2)
+    run_model.eval_h5(conf, ckpt)
+    time.sleep(2)
     run_model.eval_te(conf, ckpt)
 
 
