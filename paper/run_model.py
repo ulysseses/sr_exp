@@ -238,9 +238,13 @@ def infer(img, Xs, y, sess, conf, save=None):
     h0, w0 = lr_y.shape
     lr_y = preproc.padcrop(lr_y, cw)
     h1, w1 = lr_y.shape
+    print("h0, w0:", h0, w0)
+    print("h1, w1:", h1, w1)
 
     # Fill into a data array
     n_y, n_x = preproc._num_crops(lr_y, cw, stride, tup=True)
+    print("n_y, n_x:", n_y, n_x)
+    print("n_y*n_x:", n_y * n_x)
     crops_in = np.empty((n_y*n_x, cw, cw, 1), dtype='float32')
     for i, crop in enumerate(preproc._crop_gen(lr_y, cw, stride)):
         crops_in[i] = crop[..., np.newaxis]
@@ -259,7 +263,10 @@ def infer(img, Xs, y, sess, conf, save=None):
             repeats = [1 for _ in range(chunk_size-1)] + [num_repeats]
             X_c = np.repeat(X_c, repeats, axis=0)
             chunk_size = FLAGS.num_gpus
-            
+        
+        print("chunk_size:", chunk_size)
+        print("chunk_size0:", chunk_size0)
+        
         gpu_chunk = chunk_size // FLAGS.num_gpus
         dict_input1 = [(Xs[j], X_c[j*gpu_chunk : \
                                    ((j + 1)*gpu_chunk) \
@@ -268,12 +275,13 @@ def infer(img, Xs, y, sess, conf, save=None):
                        for j in range(FLAGS.num_gpus)]
         feed = dict(dict_input1)
         tmp = sess.run(y, feed_dict=feed)
-        crops_out[i : i + FLAGS.num_gpus * mb_size] = tmp[:chunk_size0]
+        crops_out[i : i + chunk_size0] = tmp[:chunk_size0]
     gpu_time = time.time() - start_time1
     
     # Fill crops into y channel
     h2 = cw-2*cropw + (n_y - 1)*stride
     w2 = cw-2*cropw + (n_x - 1)*stride
+    print("h2, w2:", h2, w2)
     hr_y = np.zeros((h2, w2), dtype='float32')
     mask = 1e-8 * np.ones_like(hr_y, dtype='float32')
     
@@ -292,7 +300,16 @@ def infer(img, Xs, y, sess, conf, save=None):
 
     # Combine y with cb & cr, then convert to rgb
     hr_y = hr_y[:h0 - 2*cropw, :w0 - 2*cropw]
-    hr_ycc = lr_ycc[cropw:-cropw, cropw:-cropw]
+    #hr_ycc = lr_ycc[cropw:-cropw, cropw:-cropw]
+    hr_ycc = lr_ycc[cropw:, cropw:]
+    print('hr_y.shape:', hr_y.shape)
+    print('hr_ycc.shape:', hr_ycc.shape)
+    
+    min_h = min(hr_y.shape[0], hr_ycc.shape[0])
+    min_w = min(hr_y.shape[1], hr_ycc.shape[1])
+    hr_y = hr_y[:min_h, :min_w]
+    hr_ycc = hr_ycc[:min_h, :min_w]
+    
     hr_ycc[:, :, 0] = hr_y
     hr = preproc.ycc2rgb(hr_ycc)
     total_time = time.time() - start_time0
@@ -351,13 +368,15 @@ def eval_te(conf, ckpt):
             lr, gt = preproc.lr_hr(sm.imread(fn), sr)
             hr = infer(lr, Xs, y, sess, conf)
             # Evaluate
-            gt = gt[cropw:-cropw, cropw:-cropw]
+            gt = gt[cropw:, cropw:]
+            gt = gt[:hr.shape[0], :hr.shape[1]]
             diff = gt.astype(np.float32) - hr.astype(np.float32)
             mse = np.mean(diff ** 2)
             tmse += mse
             psnr = 20 * np.log10(255.0 / np.sqrt(mse))
             
-            lr = lr[cropw:-cropw, cropw:-cropw]
+            lr = lr[cropw:, cropw:]
+            lr = lr[:hr.shape[0], :hr.shape[1]]
             bl_diff = gt.astype(np.float32) - lr.astype(np.float32)
             bl_mse = np.mean(bl_diff ** 2)
             bl_tmse += bl_mse

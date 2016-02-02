@@ -10,7 +10,7 @@ augment: true
 prune: 0.0
 border: 3
 chunk_size: 20000
-data_cached: true
+data_cached: false
 
 # inference
 fw: 5
@@ -30,10 +30,10 @@ low_rank: 96 ##########
 # training
 load_in_memory: true
 mb_size: 32
-n_epochs: 12
+n_epochs: 7
 l1_reg: 0 ##########
 l2_reg: 1.E-4
 lr0: 1.E-3
-n_epochs_per_decay: 4
+n_epochs_per_decay: 3
 lr_decay_factor: 0.1
 grad_norm_thresh: 50
