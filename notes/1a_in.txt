@@ -3,18 +3,16 @@ I tensorflow/stream_executor/dso_loader.cc:101] successfully opened CUDA library
 I tensorflow/stream_executor/dso_loader.cc:101] successfully opened CUDA library libcufft.so.7.0 locally
 I tensorflow/stream_executor/dso_loader.cc:101] successfully opened CUDA library libcuda.so locally
 I tensorflow/stream_executor/dso_loader.cc:101] successfully opened CUDA library libcurand.so.7.0 locally
-INFO:tensorflow:Created variable global_step:0 with shape () and init <function _initializer at 0x7f938a0f4b18>
-INFO:tensorflow:Created variable global_step:0 with shape () and init <function _initializer at 0x7f938a0f4b18>
-INFO:tensorflow:Created variable thresh:0 with shape (256,) and init <function _initializer at 0x7f938a0f4b18>
-INFO:tensorflow:Created variable thresh:0 with shape (256,) and init <function _initializer at 0x7f938a0f4b18>
-INFO:tensorflow:Created variable w_conv:0 with shape (5, 5, 1, 4) and init <function _initializer at 0x7f9300a057d0>
-INFO:tensorflow:Created variable w_conv:0 with shape (5, 5, 1, 4) and init <function _initializer at 0x7f9300a057d0>
-INFO:tensorflow:Created variable lista/w_e:0 with shape (100, 256) and init <function _initializer at 0x7f9300a057d0>
-INFO:tensorflow:Created variable lista/w_e:0 with shape (100, 256) and init <function _initializer at 0x7f9300a057d0>
-INFO:tensorflow:Created variable lista/w_s:0 with shape (256, 256) and init <function _initializer at 0x7f9300a057d0>
-INFO:tensorflow:Created variable lista/w_s:0 with shape (256, 256) and init <function _initializer at 0x7f9300a057d0>
-INFO:tensorflow:Created variable lista/w_d:0 with shape (256, 25) and init <function _initializer at 0x7f9300a057d0>
-INFO:tensorflow:Created variable lista/w_d:0 with shape (256, 25) and init <function _initializer at 0x7f9300a057d0>
+INFO:tensorflow:Created variable thresh:0 with shape (256,) and init <function _initializer at 0x7fd303b54b18>
+INFO:tensorflow:Created variable thresh:0 with shape (256,) and init <function _initializer at 0x7fd303b54b18>
+INFO:tensorflow:Created variable w_conv:0 with shape (5, 5, 1, 4) and init <function _initializer at 0x7fd2983b4668>
+INFO:tensorflow:Created variable w_conv:0 with shape (5, 5, 1, 4) and init <function _initializer at 0x7fd2983b4668>
+INFO:tensorflow:Created variable lista/w_e:0 with shape (100, 256) and init <function _initializer at 0x7fd2983b4668>
+INFO:tensorflow:Created variable lista/w_e:0 with shape (100, 256) and init <function _initializer at 0x7fd2983b4668>
+INFO:tensorflow:Created variable lista/w_s:0 with shape (256, 256) and init <function _initializer at 0x7fd2983b4668>
+INFO:tensorflow:Created variable lista/w_s:0 with shape (256, 256) and init <function _initializer at 0x7fd2983b4668>
+INFO:tensorflow:Created variable lista/w_d:0 with shape (256, 25) and init <function _initializer at 0x7fd2983b4668>
+INFO:tensorflow:Created variable lista/w_d:0 with shape (256, 25) and init <function _initializer at 0x7fd2983b4668>
 I tensorflow/core/common_runtime/local_device.cc:40] Local device intra op parallelism threads: 32
 I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:909] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
 I tensorflow/core/common_runtime/gpu/gpu_init.cc:103] Found device 0 with properties: 
@@ -166,7 +164,3 @@ I tensorflow/core/common_runtime/gpu/gpu_bfc_allocator.cc:66] Creating bin of ma
 I tensorflow/core/common_runtime/gpu/gpu_bfc_allocator.cc:66] Creating bin of max chunk size 2.00GiB
 I tensorflow/core/common_runtime/gpu/gpu_bfc_allocator.cc:66] Creating bin of max chunk size 4.00GiB
 I tensorflow/core/common_runtime/direct_session.cc:61] Direct session inter op parallelism threads: 32
-W tensorflow/core/common_runtime/gpu/pool_allocator.cc:242] PoolAllocator: After 3817 get requests, put_count=3280 evicted_count=1000 eviction_rate=0.304878 and unsatisfied allocation rate=0.428871
-I tensorflow/core/common_runtime/gpu/pool_allocator.cc:254] Raising pool_size_limit_ from 100 to 110
-W tensorflow/core/common_runtime/gpu/pool_allocator.cc:242] PoolAllocator: After 7472 get requests, put_count=7527 evicted_count=1000 eviction_rate=0.132855 and unsatisfied allocation rate=0.12955
-I tensorflow/core/common_runtime/gpu/pool_allocator.cc:254] Raising pool_size_limit_ from 256 to 281

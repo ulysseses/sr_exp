@@ -437,7 +437,7 @@ def inference(x, conf):
         # [bs*(h//ps)*(w//ps), n_c] -> [bs*(h//ps)*(w//ps), pw*pw]
         y_out = tf.matmul(z, w_d, name='y_out')
 
-        for var in [w_e, w_s, w_d, z]:
+        for var in [w_e, w_s, w_d]:
             name = re.sub('%s_[0-9]*/' % FLAGS.tower_name, '', var.op.name)
             tf.histogram_summary(name, var)
             tf.add_to_collection('decay_vars', var)
@@ -502,27 +502,25 @@ def loss(y, Y, conf, scope=None):
     Returns:
       total_loss: total loss Tensor
     """
+    which_gpu = int(scope[-3:-1])
     l1_reg = conf['l1_reg']
     l2_reg = conf['l2_reg']
     sq_loss = tf.nn.l2_loss(y - Y, name='sq_loss')
     tf.add_to_collection('losses', sq_loss)
     if l1_reg > 0:
         with tf.name_scope('l1_decay'):
-            z = tf.get_collection('l1_decay', scope=scope)[0]
+            z = tf.get_collection('l1_decay', scope=scope)[which_gpu]
             l1_decay = tf.mul(tf.reduce_sum(tf.abs(z)), l1_reg, name='l1')
             tf.add_to_collection('losses', l1_decay)
     if l2_reg > 0:
         with tf.name_scope('l2_decay'):
-            for decay_var in tf.get_collection('decay_vars', scope=scope):
+            for decay_var in tf.get_collection('decay_vars')[which_gpu*4:]:
                 weight_decay = tf.mul(tf.nn.l2_loss(decay_var), l2_reg,
                                       name=decay_var.op.name)
                 tf.add_to_collection('losses', weight_decay)
 
-    if len(tf.get_collection('losses', scope=scope)) != 1:
-        total_loss = tf.add_n(tf.get_collection('losses', scope=scope),
-                              name='total_loss')
-    else:
-        total_loss = sq_loss
+    total_loss = tf.add_n(tf.get_collection('losses', scope=scope),
+                          name='total_loss')
 
     # Add loss summaries
     for loss in tf.get_collection('losses', scope=scope) + [total_loss]:
