@@ -173,7 +173,7 @@ def train(conf, ckpt=None):
                 sess.run(apply_grad_op, feed_dict=feed)
                 duration_tr = time.time() - start_time
 
-                if step % 20 == 0:
+                if step % 10 == 0:
                     feed2 = dict(dict_input1)
                     
                     start_time = time.time()
@@ -187,11 +187,11 @@ def train(conf, ckpt=None):
                           ex_per_step_tr, float(duration_tr / FLAGS.num_gpus),
                           ex_per_step_eval, float(duration_eval / FLAGS.num_gpus)))
 
-                if step % 100 == 0:
+                if step % 25 == 0:
                     summ_str = sess.run(summ_op, feed_dict=feed)
                     summ_writer.add_summary(summ_str, step)
 
-                if step % 400 == 0:
+                if step % 100 == 0:
                     saver.save(sess, os.path.join(path_tmp, 'ckpt'),
                         global_step=step)
 
