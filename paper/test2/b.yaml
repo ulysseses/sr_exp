@@ -1,5 +1,5 @@
 # store_hdf5
-path_tmp: tmp/paper/test2
+path_tmp: tmp/paper/test2/b
 path_tr: data/Yang
 path_te: data/Set14
 path_va: data/Set5
@@ -30,10 +30,10 @@ low_rank: -1
 # training
 load_in_memory: true
 mb_size: 64
-n_epochs: 12
+n_epochs: 18
 l1_reg: 0
-l2_reg: 1.E-5
+l2_reg: 1.E-4
 lr0: 1.E-3
-n_epochs_per_decay: 4
+n_epochs_per_decay: 6
 lr_decay_factor: 0.1
 grad_norm_thresh: 50
