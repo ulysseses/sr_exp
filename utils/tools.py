@@ -47,9 +47,9 @@ def prepare_data(conf):
       tr_stream: DataStream for training set
       te_stream: DataStream for testing set
     """
-    preproc.store_hdf5(conf)#, compression='lzf')
+    preproc.store_hdf5(conf, compression='lzf')
     
-    path_h5 = os.path.join(conf['path_tmp'], 'data.h5')
+    path_h5 = conf['path_h5']
 
     tr_set = H5PYDataset(path_h5, ('train',), sources=('LR', 'HR'),
                          load_in_memory=conf['load_in_memory'])

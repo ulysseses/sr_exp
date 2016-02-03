@@ -284,7 +284,7 @@ def store_hdf5(conf, pp=None, **kwargs):
 
     Args:
       conf:
-        path_tmp: path to write hdf5 file
+        path_h5: path to write hdf5 file
         path_tr: path to training images
         path_te: path to testing images
         path_va: path to validation images
@@ -298,7 +298,7 @@ def store_hdf5(conf, pp=None, **kwargs):
       pp (None): if not None, function/lambda to preprocess image
       **kwargs: passed to h5py.File
     """
-    path_tmp            = conf['path_tmp']
+    path_h5            = conf['path_h5']
     path_tr             = conf['path_tr']
     path_te             = conf['path_te']
     path_va             = conf['path_va']
@@ -316,8 +316,6 @@ def store_hdf5(conf, pp=None, **kwargs):
         return
     print('caching data...')
     start_time = time.time()
-
-    path_h5 = os.path.join(path_tmp, 'data.h5')
     
     # Count number of training/testing examples
     fns_tr = _get_filenames(path_tr)
