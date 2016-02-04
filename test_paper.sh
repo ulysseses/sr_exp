@@ -1,25 +1,27 @@
-# test1
-python test_paper.py --command train --path_conf paper/test1/a.yaml
-python test_paper.py --command infer --path_conf paper/test1/a.yaml 2>&1 | \
-    tee notes/1a_in.txt
+#!/bin/bash -x
 
-python test_paper.py --command train --path_conf paper/test1/b.yaml
-python test_paper.py --command infer --path_conf paper/test1/b.yaml 2>&1 | \
-    tee notes/1b_in.txt
+# # test1
+# python test_paper.py --command train --path_conf paper/test1/a.yaml
+# python test_paper.py --command infer --path_conf paper/test1/a.yaml 2>&1 | \
+#     tee notes/1a_in.txt
 
-# test2
-python test_paper.py --command train --path_conf paper/test2/b.yaml
-python test_paper.py --command infer --path_conf paper/test2/b.yaml 2>&1 | \
-    tee notes/2b_in.txt
+# python test_paper.py --command train --path_conf paper/test1/b.yaml
+# python test_paper.py --command infer --path_conf paper/test1/b.yaml 2>&1 | \
+#     tee notes/1b_in.txt
 
-# test3
-python test_paper.py --command train --path_conf paper/test3/b.yaml
-python test_paper.py --command infer --path_conf paper/test3/b.yaml 2>&1 | \
-    tee notes/3b_in.txt
+# # test2
+# python test_paper.py --command train --path_conf paper/test2/b.yaml
+# python test_paper.py --command infer --path_conf paper/test2/b.yaml 2>&1 | \
+#     tee notes/2b_in.txt
 
-python test_paper.py --command train --path_conf paper/test3/c.yaml
-python test_paper.py --command infer --path_conf paper/test3/c.yaml 2>&1 | \
-    tee notes/3c_in.txt
+# # test3
+# python test_paper.py --command train --path_conf paper/test3/b.yaml
+# python test_paper.py --command infer --path_conf paper/test3/b.yaml 2>&1 | \
+#     tee notes/3b_in.txt
+
+# python test_paper.py --command train --path_conf paper/test3/c.yaml
+# python test_paper.py --command infer --path_conf paper/test3/c.yaml 2>&1 | \
+#     tee notes/3c_in.txt
 
 # test4
 python test_paper.py --command train --path_conf paper/test4/b.yaml
@@ -29,6 +31,10 @@ python test_paper.py --command infer --path_conf paper/test4/b.yaml 2>&1 | \
 python test_paper.py --command train --path_conf paper/test4/c.yaml
 python test_paper.py --command infer --path_conf paper/test4/c.yaml 2>&1 | \
     tee notes/4c_in.txt
+    
+python test_paper.py --command train --path_conf paper/test4/d.yaml
+python test_paper.py --command infer --path_conf paper/test4/d.yaml 2>&1 | \
+    tee notes/4d_in.txt
 
 # test5
 python test_paper.py --command train --path_conf paper/test5/b.yaml

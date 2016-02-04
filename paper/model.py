@@ -517,7 +517,7 @@ def loss(y, Y, conf, scope=None):
     tf.add_to_collection('losses', sq_loss)
     if l1_reg > 0:
         with tf.name_scope('l1_decay'):
-            z = tf.get_collection('l1_decay', scope=scope)[which_gpu]
+            z = tf.get_collection('l1_decay')[which_gpu]
             l1_decay = tf.mul(tf.reduce_sum(tf.abs(z)), l1_reg, name='l1')
             tf.add_to_collection('losses', l1_decay)
     if l2_reg > 0:

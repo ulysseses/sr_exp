@@ -26,12 +26,12 @@ thresh0: 9.E-3
 subnet_name: lista
 prox_name: gst  ####################
 p: 0.8
-low_rank: 96 ##########
+low_rank: -1 ##########
 
 # training
 path_tmp: tmp/paper/test5/b
 load_in_memory: true
-mb_size: 128
+mb_size: 64
 n_epochs: 11
 l1_reg: 0 ##########
 l2_reg: 1.E-4
