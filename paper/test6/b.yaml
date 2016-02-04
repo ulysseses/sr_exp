@@ -31,10 +31,10 @@ low_rank: 96 ##########
 path_tmp: tmp/paper/test6/b
 load_in_memory: true
 mb_size: 128
-n_epochs: 12
+n_epochs: 11
 l1_reg: 0 ##########
 l2_reg: 1.E-4
 lr0: 1.E-2
-n_epochs_per_decay: 4
+n_epochs_per_decay: 5
 lr_decay_factor: 0.1
 grad_norm_thresh: 50
