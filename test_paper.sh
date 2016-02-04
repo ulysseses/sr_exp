@@ -41,7 +41,11 @@
 # python test_paper.py --command infer --path_conf paper/test5/b.yaml 2>&1 | \
 #     tee notes/5b_in.txt
 
-# test 6
-python test_paper.py --command train --path_conf paper/test6/b.yaml
-python test_paper.py --command infer --path_conf paper/test6/b.yaml 2>&1 | \
-    tee notes/6b_in.txt
+# # test 6
+# python test_paper.py --command train --path_conf paper/test6/b.yaml
+# python test_paper.py --command infer --path_conf paper/test6/b.yaml 2>&1 | \
+#     tee notes/6b_in.txt
+
+# python test_paper.py --command train --path_conf paper/test6/c.yaml
+python test_paper.py --command infer --path_conf paper/test6/c.yaml 2>&1 | \
+    tee notes/6c_in.txt

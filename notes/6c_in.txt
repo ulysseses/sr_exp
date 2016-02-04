@@ -3,16 +3,18 @@ I tensorflow/stream_executor/dso_loader.cc:101] successfully opened CUDA library
 I tensorflow/stream_executor/dso_loader.cc:101] successfully opened CUDA library libcufft.so.7.0 locally
 I tensorflow/stream_executor/dso_loader.cc:101] successfully opened CUDA library libcuda.so locally
 I tensorflow/stream_executor/dso_loader.cc:101] successfully opened CUDA library libcurand.so.7.0 locally
-INFO:tensorflow:Created variable thresh:0 with shape (192,) and init <function _initializer at 0x7fad48785b18>
-INFO:tensorflow:Created variable thresh:0 with shape (192,) and init <function _initializer at 0x7fad48785b18>
-INFO:tensorflow:Created variable w_conv:0 with shape (5, 5, 1, 4) and init <function _initializer at 0x7facdcf896e0>
-INFO:tensorflow:Created variable w_conv:0 with shape (5, 5, 1, 4) and init <function _initializer at 0x7facdcf896e0>
-INFO:tensorflow:Created variable lcod/w_e:0 with shape (100, 192) and init <function _initializer at 0x7facdcf896e0>
-INFO:tensorflow:Created variable lcod/w_e:0 with shape (100, 192) and init <function _initializer at 0x7facdcf896e0>
-INFO:tensorflow:Created variable lcod/w_s:0 with shape (192, 192) and init <function _initializer at 0x7facdcf896e0>
-INFO:tensorflow:Created variable lcod/w_s:0 with shape (192, 192) and init <function _initializer at 0x7facdcf896e0>
-INFO:tensorflow:Created variable lcod/w_d:0 with shape (192, 25) and init <function _initializer at 0x7facdcf896e0>
-INFO:tensorflow:Created variable lcod/w_d:0 with shape (192, 25) and init <function _initializer at 0x7facdcf896e0>
+INFO:tensorflow:Created variable thresh:0 with shape (192,) and init <function _initializer at 0x7f9085259b18>
+INFO:tensorflow:Created variable thresh:0 with shape (192,) and init <function _initializer at 0x7f9085259b18>
+INFO:tensorflow:Created variable w_conv:0 with shape (5, 5, 1, 4) and init <function _initializer at 0x7f9019aa96e0>
+INFO:tensorflow:Created variable w_conv:0 with shape (5, 5, 1, 4) and init <function _initializer at 0x7f9019aa96e0>
+INFO:tensorflow:Created variable lcod/w_e:0 with shape (100, 192) and init <function _initializer at 0x7f9019aa96e0>
+INFO:tensorflow:Created variable lcod/w_e:0 with shape (100, 192) and init <function _initializer at 0x7f9019aa96e0>
+INFO:tensorflow:Created variable lcod/w_s1:0 with shape (192, 48) and init <function _initializer at 0x7f9019aa96e0>
+INFO:tensorflow:Created variable lcod/w_s1:0 with shape (192, 48) and init <function _initializer at 0x7f9019aa96e0>
+INFO:tensorflow:Created variable lcod/w_s2:0 with shape (48, 192) and init <function _initializer at 0x7f9019aa96e0>
+INFO:tensorflow:Created variable lcod/w_s2:0 with shape (48, 192) and init <function _initializer at 0x7f9019aa96e0>
+INFO:tensorflow:Created variable lcod/w_d:0 with shape (192, 25) and init <function _initializer at 0x7f9019aa96e0>
+INFO:tensorflow:Created variable lcod/w_d:0 with shape (192, 25) and init <function _initializer at 0x7f9019aa96e0>
 WARNING:tensorflow:case: Provided dictionary of predicate/fn pairs, but exclusive=False.  Order of conditional tests is not guaranteed.
 WARNING:tensorflow:case: Provided dictionary of predicate/fn pairs, but exclusive=False.  Order of conditional tests is not guaranteed.
 WARNING:tensorflow:case: Provided dictionary of predicate/fn pairs, but exclusive=False.  Order of conditional tests is not guaranteed.
@@ -220,18 +222,20 @@ I tensorflow/core/common_runtime/gpu/gpu_bfc_allocator.cc:66] Creating bin of ma
 I tensorflow/core/common_runtime/gpu/gpu_bfc_allocator.cc:66] Creating bin of max chunk size 2.00GiB
 I tensorflow/core/common_runtime/gpu/gpu_bfc_allocator.cc:66] Creating bin of max chunk size 4.00GiB
 I tensorflow/core/common_runtime/direct_session.cc:61] Direct session inter op parallelism threads: 32
-W tensorflow/core/common_runtime/gpu/pool_allocator.cc:242] PoolAllocator: After 10260 get requests, put_count=9494 evicted_count=1000 eviction_rate=0.10533 and unsatisfied allocation rate=0.181871
+W tensorflow/core/common_runtime/gpu/pool_allocator.cc:242] PoolAllocator: After 11032 get requests, put_count=10266 evicted_count=1000 eviction_rate=0.0974089 and unsatisfied allocation rate=0.169144
 I tensorflow/core/common_runtime/gpu/pool_allocator.cc:254] Raising pool_size_limit_ from 100 to 110
-INFO:tensorflow:Created variable thresh:0 with shape (192,) and init <function _initializer at 0x7faca6dd7758>
-INFO:tensorflow:Created variable thresh:0 with shape (192,) and init <function _initializer at 0x7faca6dd7758>
-INFO:tensorflow:Created variable w_conv:0 with shape (5, 5, 1, 4) and init <function _initializer at 0x7faca6dd7aa0>
-INFO:tensorflow:Created variable w_conv:0 with shape (5, 5, 1, 4) and init <function _initializer at 0x7faca6dd7aa0>
-INFO:tensorflow:Created variable lcod/w_e:0 with shape (100, 192) and init <function _initializer at 0x7faca6dd7aa0>
-INFO:tensorflow:Created variable lcod/w_e:0 with shape (100, 192) and init <function _initializer at 0x7faca6dd7aa0>
-INFO:tensorflow:Created variable lcod/w_s:0 with shape (192, 192) and init <function _initializer at 0x7faca6dd7aa0>
-INFO:tensorflow:Created variable lcod/w_s:0 with shape (192, 192) and init <function _initializer at 0x7faca6dd7aa0>
-INFO:tensorflow:Created variable lcod/w_d:0 with shape (192, 25) and init <function _initializer at 0x7faca6dd7aa0>
-INFO:tensorflow:Created variable lcod/w_d:0 with shape (192, 25) and init <function _initializer at 0x7faca6dd7aa0>
+INFO:tensorflow:Created variable thresh:0 with shape (192,) and init <function _initializer at 0x7f8fe388e398>
+INFO:tensorflow:Created variable thresh:0 with shape (192,) and init <function _initializer at 0x7f8fe388e398>
+INFO:tensorflow:Created variable w_conv:0 with shape (5, 5, 1, 4) and init <function _initializer at 0x7f8fe388e6e0>
+INFO:tensorflow:Created variable w_conv:0 with shape (5, 5, 1, 4) and init <function _initializer at 0x7f8fe388e6e0>
+INFO:tensorflow:Created variable lcod/w_e:0 with shape (100, 192) and init <function _initializer at 0x7f8fe388e6e0>
+INFO:tensorflow:Created variable lcod/w_e:0 with shape (100, 192) and init <function _initializer at 0x7f8fe388e6e0>
+INFO:tensorflow:Created variable lcod/w_s1:0 with shape (192, 48) and init <function _initializer at 0x7f8fe388e6e0>
+INFO:tensorflow:Created variable lcod/w_s1:0 with shape (192, 48) and init <function _initializer at 0x7f8fe388e6e0>
+INFO:tensorflow:Created variable lcod/w_s2:0 with shape (48, 192) and init <function _initializer at 0x7f8fe388e6e0>
+INFO:tensorflow:Created variable lcod/w_s2:0 with shape (48, 192) and init <function _initializer at 0x7f8fe388e6e0>
+INFO:tensorflow:Created variable lcod/w_d:0 with shape (192, 25) and init <function _initializer at 0x7f8fe388e6e0>
+INFO:tensorflow:Created variable lcod/w_d:0 with shape (192, 25) and init <function _initializer at 0x7f8fe388e6e0>
 WARNING:tensorflow:case: Provided dictionary of predicate/fn pairs, but exclusive=False.  Order of conditional tests is not guaranteed.
 WARNING:tensorflow:case: Provided dictionary of predicate/fn pairs, but exclusive=False.  Order of conditional tests is not guaranteed.
 WARNING:tensorflow:case: Provided dictionary of predicate/fn pairs, but exclusive=False.  Order of conditional tests is not guaranteed.
@@ -296,8 +300,8 @@ found ckpt: tmp/paper/test6/b/ckpt-3058
 data already cached...
 training set: 500 mb
 testing set: 89 mb
-approx psnr_tr=30.882
-approx psnr_te=29.150
+approx psnr_tr=30.894
+approx psnr_te=29.348
 h0, w0: 570 714
 h1, w1: 588 714
 n_y, n_x: 27 33
@@ -319,8 +323,8 @@ chunk_size0: 123
 h2, w2: 582 708
 hr_y.shape: (564, 708)
 hr_ycc.shape: (567, 711, 3)
-total time: 1.8 | gpu time: 1.8
-hr PSNR: 26.966, lr PSNR  26.415 for img_002_SRF_4_HR.png
+total time: 1.9 | gpu time: 1.8
+hr PSNR: 26.949, lr PSNR  26.415 for img_002_SRF_4_HR.png
 h0, w0: 282 346
 h1, w1: 294 378
 n_y, n_x: 13 17
@@ -333,7 +337,7 @@ h2, w2: 288 372
 hr_y.shape: (276, 340)
 hr_ycc.shape: (279, 343, 3)
 total time: 0.4 | gpu time: 0.4
-hr PSNR: 29.189, lr PSNR  27.930 for img_004_SRF_4_HR.png
+hr PSNR: 29.226, lr PSNR  27.930 for img_004_SRF_4_HR.png
 h0, w0: 650 522
 h1, w1: 672 546
 n_y, n_x: 31 25
@@ -355,8 +359,8 @@ chunk_size0: 7
 h2, w2: 666 540
 hr_y.shape: (644, 516)
 hr_ycc.shape: (647, 519, 3)
-total time: 1.3 | gpu time: 1.3
-hr PSNR: 27.825, lr PSNR  25.167 for img_013_SRF_4_HR.png
+total time: 1.4 | gpu time: 1.4
+hr PSNR: 28.333, lr PSNR  25.167 for img_013_SRF_4_HR.png
 h0, w0: 354 242
 h1, w1: 378 252
 n_y, n_x: 17 11
@@ -368,8 +372,8 @@ chunk_size0: 59
 h2, w2: 372 246
 hr_y.shape: (348, 236)
 hr_ycc.shape: (351, 239, 3)
-total time: 0.3 | gpu time: 0.3
-hr PSNR: 26.060, lr PSNR  24.442 for img_005_SRF_4_HR.png
+total time: 0.4 | gpu time: 0.3
+hr PSNR: 26.686, lr PSNR  24.442 for img_005_SRF_4_HR.png
 h0, w0: 382 578
 h1, w1: 420 588
 n_y, n_x: 19 27
@@ -387,8 +391,8 @@ chunk_size0: 1
 h2, w2: 414 582
 hr_y.shape: (376, 572)
 hr_ycc.shape: (379, 575, 3)
-total time: 1.0 | gpu time: 0.9
-hr PSNR: 31.932, lr PSNR  29.200 for img_014_SRF_4_HR.png
+total time: 0.9 | gpu time: 0.9
+hr PSNR: 32.188, lr PSNR  29.200 for img_014_SRF_4_HR.png
 h0, w0: 506 506
 h1, w1: 546 546
 n_y, n_x: 25 25
@@ -406,8 +410,8 @@ chunk_size0: 113
 h2, w2: 540 540
 hr_y.shape: (500, 500)
 hr_ycc.shape: (503, 503, 3)
-total time: 1.1 | gpu time: 1.0
-hr PSNR: 33.100, lr PSNR  32.194 for img_012_SRF_4_HR.png
+total time: 1.1 | gpu time: 1.1
+hr PSNR: 33.097, lr PSNR  32.194 for img_012_SRF_4_HR.png
 h0, w0: 282 346
 h1, w1: 294 378
 n_y, n_x: 13 17
@@ -420,7 +424,26 @@ h2, w2: 288 372
 hr_y.shape: (276, 340)
 hr_ycc.shape: (279, 343, 3)
 total time: 0.4 | gpu time: 0.4
-hr PSNR: 36.084, lr PSNR  33.289 for img_008_SRF_4_HR.png
+hr PSNR: 36.301, lr PSNR  33.289 for img_008_SRF_4_HR.png
+h0, w0: 506 506
+h1, w1: 546 546
+n_y, n_x: 25 25
+n_y*n_x: 625
+chunk_size: 128
+chunk_size0: 128
+chunk_size: 128
+chunk_size0: 128
+chunk_size: 128
+chunk_size0: 128
+chunk_size: 128
+chunk_size0: 128
+chunk_size: 113
+chunk_size0: 113
+h2, w2: 540 540
+hr_y.shape: (500, 500)
+hr_ycc.shape: (503, 503, 3)
+total time: 1.1 | gpu time: 1.1
+hr PSNR: 33.372, lr PSNR  32.309 for img_009_SRF_4_HR.png
 h0, w0: 506 506
 h1, w1: 546 546
 n_y, n_x: 25 25
@@ -439,26 +462,7 @@ h2, w2: 540 540
 hr_y.shape: (500, 500)
 hr_ycc.shape: (503, 503, 3)
 total time: 1.1 | gpu time: 1.0
-hr PSNR: 33.364, lr PSNR  32.309 for img_009_SRF_4_HR.png
-h0, w0: 506 506
-h1, w1: 546 546
-n_y, n_x: 25 25
-n_y*n_x: 625
-chunk_size: 128
-chunk_size0: 128
-chunk_size: 128
-chunk_size0: 128
-chunk_size: 128
-chunk_size0: 128
-chunk_size: 128
-chunk_size0: 128
-chunk_size: 113
-chunk_size0: 113
-h2, w2: 540 540
-hr_y.shape: (500, 500)
-hr_ycc.shape: (503, 503, 3)
-total time: 1.1 | gpu time: 1.0
-hr PSNR: 29.566, lr PSNR  27.872 for img_010_SRF_4_HR.png
+hr PSNR: 29.564, lr PSNR  27.872 for img_010_SRF_4_HR.png
 h0, w0: 474 494
 h1, w1: 504 504
 n_y, n_x: 23 23
@@ -477,7 +481,7 @@ h2, w2: 498 498
 hr_y.shape: (468, 488)
 hr_ycc.shape: (471, 491, 3)
 total time: 0.9 | gpu time: 0.9
-hr PSNR: 23.218, lr PSNR  22.686 for img_001_SRF_4_HR.png
+hr PSNR: 23.270, lr PSNR  22.686 for img_001_SRF_4_HR.png
 h0, w0: 506 762
 h1, w1: 546 798
 n_y, n_x: 25 37
@@ -501,8 +505,8 @@ chunk_size0: 29
 h2, w2: 540 792
 hr_y.shape: (500, 756)
 hr_ycc.shape: (503, 759, 3)
-total time: 1.6 | gpu time: 1.5
-hr PSNR: 35.474, lr PSNR  31.460 for img_011_SRF_4_HR.png
+total time: 1.6 | gpu time: 1.6
+hr PSNR: 35.662, lr PSNR  31.460 for img_011_SRF_4_HR.png
 h0, w0: 270 270
 h1, w1: 294 294
 n_y, n_x: 13 13
@@ -534,7 +538,7 @@ h2, w2: 540 540
 hr_y.shape: (500, 500)
 hr_ycc.shape: (503, 503, 3)
 total time: 1.1 | gpu time: 1.0
-hr PSNR: 27.829, lr PSNR  26.600 for img_003_SRF_4_HR.png
+hr PSNR: 27.824, lr PSNR  26.600 for img_003_SRF_4_HR.png
 h0, w0: 354 494
 h1, w1: 378 504
 n_y, n_x: 17 23
@@ -550,7 +554,7 @@ chunk_size0: 7
 h2, w2: 372 498
 hr_y.shape: (348, 488)
 hr_ycc.shape: (351, 491, 3)
-total time: 0.7 | gpu time: 0.7
-hr PSNR: 30.322, lr PSNR  28.385 for img_007_SRF_4_HR.png
-total test PSNR: 28.774
+total time: 0.8 | gpu time: 0.7
+hr PSNR: 30.336, lr PSNR  28.385 for img_007_SRF_4_HR.png
+total test PSNR: 28.925
 total baseline PSNR: 27.397
