@@ -3,8 +3,8 @@ path_h5: tmp/data.h5
 path_tr: data/BSDS500/train
 path_te: data/BSDS500/test
 path_va: data/BSDS500/val
-cw: 41
-stride: 20
+cw: 42
+stride: 21
 sr: 2
 augment: true
 prune: 0.0
