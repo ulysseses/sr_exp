@@ -366,7 +366,8 @@ def eval_te(conf, ckpt):
         bl_tmse = 0
         for fn in fns_te:
             lr, gt = preproc.lr_hr(sm.imread(fn), sr)
-            hr = infer(lr, Xs, y, sess, conf)
+            #a, b = fn.split('.')
+            hr = infer(lr, Xs, y, sess, conf)#, a + '_HR' + b)
             # Evaluate
             gt = gt[cropw:, cropw:]
             gt = gt[:hr.shape[0], :hr.shape[1]]

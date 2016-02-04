@@ -23,23 +23,23 @@
 # python test_paper.py --command infer --path_conf paper/test3/c.yaml 2>&1 | \
 #     tee notes/3c_in.txt
 
-# test4
-python test_paper.py --command train --path_conf paper/test4/b.yaml
-python test_paper.py --command infer --path_conf paper/test4/b.yaml 2>&1 | \
-    tee notes/4b_in.txt
+# # test4
+# python test_paper.py --command train --path_conf paper/test4/b.yaml
+# python test_paper.py --command infer --path_conf paper/test4/b.yaml 2>&1 | \
+#     tee notes/4b_in.txt
 
-python test_paper.py --command train --path_conf paper/test4/c.yaml
-python test_paper.py --command infer --path_conf paper/test4/c.yaml 2>&1 | \
-    tee notes/4c_in.txt
+# python test_paper.py --command train --path_conf paper/test4/c.yaml
+# python test_paper.py --command infer --path_conf paper/test4/c.yaml 2>&1 | \
+#     tee notes/4c_in.txt
     
-python test_paper.py --command train --path_conf paper/test4/d.yaml
-python test_paper.py --command infer --path_conf paper/test4/d.yaml 2>&1 | \
-    tee notes/4d_in.txt
+# python test_paper.py --command train --path_conf paper/test4/d.yaml
+# python test_paper.py --command infer --path_conf paper/test4/d.yaml 2>&1 | \
+#     tee notes/4d_in.txt
 
-# test5
-python test_paper.py --command train --path_conf paper/test5/b.yaml
-python test_paper.py --command infer --path_conf paper/test5/b.yaml 2>&1 | \
-    tee notes/5b_in.txt
+# # test5
+# python test_paper.py --command train --path_conf paper/test5/b.yaml
+# python test_paper.py --command infer --path_conf paper/test5/b.yaml 2>&1 | \
+#     tee notes/5b_in.txt
 
 # test 6
 python test_paper.py --command train --path_conf paper/test6/b.yaml

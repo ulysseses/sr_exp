@@ -36,14 +36,26 @@ def infer(path):
     run_model.eval_h5(conf, ckpt)
     time.sleep(2)
     run_model.eval_te(conf, ckpt)
+    
+
+def blah(path):
+    with open(path, 'r') as f:
+        conf = yaml.load(f)
+    ckpt = tf.train.get_checkpoint_state(conf['path_tmp'])
+    if ckpt:
+        ckpt = ckpt.model_checkpoint_path
+        print('found ckpt: %s' % ckpt)
+        time.sleep(2)
+    run_model.eval_te(conf, ckpt)
 
 
 if __name__ == '__main__':
-    command = FLAGS.command
-    path = FLAGS.path_conf
-    if command[:2].lower() == 'tr':
-        train(path)
-    elif command[:2].lower() == 'in':
-        infer(path)
-    else:
-        raise ValueError('command %s not recognized' % command)
+    blah('paper/test3/b.yaml')
+    #command = FLAGS.command
+    #path = FLAGS.path_conf
+    #if command[:2].lower() == 'tr':
+    #    train(path)
+    #elif command[:2].lower() == 'in':
+    #    infer(path)
+    #else:
+    #    raise ValueError('command %s not recognized' % command)
