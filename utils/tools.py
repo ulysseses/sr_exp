@@ -47,7 +47,7 @@ def prepare_data(conf):
       tr_stream: DataStream for training set
       te_stream: DataStream for testing set
     """
-    preproc.store_hdf5(conf, compression='lzf')
+    preproc.store_hdf5(conf)#, compression='lzf')
     
     path_h5 = conf['path_h5']
 
