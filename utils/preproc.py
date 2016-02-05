@@ -33,8 +33,6 @@ def imresize(img, s):
     Returns:
       img: uint8 resized & bi-cubic interpolated image
     """
-    #if s < 1:
-    #    img = gaussian_filter(img, 0.5)
     img = sm.imresize(img, s, interp='bicubic')
     return img
 
@@ -264,7 +262,11 @@ def store_hdf5(conf, pp=None, **kwargs):
     hrs = np.empty((chunk_size, cw, cw, 1), dtype=np.float32)
     ind_tr = 0
     for fn in fns_tr:
-        img = rgb2ycc(sm.imread(fn))[:, :, 0]  # rgb --> y
+        img = sm.imread(fn)
+        if len(img.shape) == 3:
+            img = rgb2ycc(sm.imread(fn))[:, :, 0]  # rgb --> y
+        else:
+            pass  # img is already y
         img_lr, img_hr = lr_hr(img, sr, border)
         img_lr, img_hr = byte2unit(img_lr), byte2unit(img_hr)
 
@@ -301,7 +303,11 @@ def store_hdf5(conf, pp=None, **kwargs):
 
         ind_tr = 0
         for fn in fns_tr:
-            img = rgb2ycc(sm.imread(fn))[:, :, 0]  # rgb --> y
+            img = sm.imread(fn)
+            if len(img.shape) == 3:
+                img = rgb2ycc(sm.imread(fn))[:, :, 0]  # rgb --> y
+            else:
+                pass  # img is already y
             img_lr, img_hr = lr_hr(img, sr, border)
             img_lr, img_hr = byte2unit(img_lr), byte2unit(img_hr)
 
@@ -363,7 +369,11 @@ def store_hdf5(conf, pp=None, **kwargs):
     # Fill up with testing and validation data
     ind_te = ind_tr
     for fn in fns_te:
-        img = rgb2ycc(sm.imread(fn))[:, :, 0]  # rgb --> y
+        img = sm.imread(fn)
+        if len(img.shape) == 3:
+            img = rgb2ycc(sm.imread(fn))[:, :, 0]  # rgb --> y
+        else:
+            pass  # img is already y
         img_lr, img_hr = lr_hr(img, sr, border)
         img_lr, img_hr = byte2unit(img_lr), byte2unit(img_hr)
 
@@ -391,7 +401,11 @@ def store_hdf5(conf, pp=None, **kwargs):
 
     ind_va = ind_te
     for fn in fns_va:
-        img = rgb2ycc(sm.imread(fn))[:, :, 0]  # rgb --> y
+        img = sm.imread(fn)
+        if len(img.shape) == 3:
+            img = rgb2ycc(sm.imread(fn))[:, :, 0]  # rgb --> y
+        else:
+            pass  # img is already y
         img_lr, img_hr = lr_hr(img, sr, border)
         img_lr, img_hr = byte2unit(img_lr), byte2unit(img_hr)
 
@@ -446,3 +460,79 @@ def lr_hr(img, sr, border=3):
     img_lr = shave(img_lr, border)
     img_hr = shave(img_hr, border)
     return img_lr, img_hr
+
+
+def num_patches(img, conf):
+    """
+    Calculate the number of patches in H/V directions.
+
+    Args:
+      img: image
+      conf: configuration dictionary
+    Returns:
+      n_y: number of patches per column
+      n_x: number of patches per row
+    """
+    cw = conf['cw']
+	stride = conf['stride']
+    h, w = img.shape[:2]
+	n_y = len(range(0, h - cw + 1, stride))
+	n_x = len(range(0, w - cw + 1, stride))
+	return n_y, n_x
+
+
+def img2patches(img, conf):
+    """
+    Convert an image to a tensor containing overlapping patches.
+
+    Args:
+      img: image
+      conf: configuration dictionary
+    Returns:
+      patches: 4d tensor of overlapping patches
+    """
+    cw = conf['cw']
+	stride = conf['stride']
+    h, w = img.shape[:2]
+	n_y = len(range(0, h - cw + 1, stride))
+	n_x = len(range(0, w - cw + 1, stride))
+	patches = np.empty((n_y*n_x, cw, cw, 1), dtype=np.float32)
+
+	ind = 0
+	for i in range(0, h - pw + 1, stride):
+		for j in range(0, w - pw + 1, stride):
+			patches[ind] = img[i : i + pw, j : j + pw, np.newaxis]
+			ind += 1
+	assert ind == n_y*n_x
+
+	return patches
+
+
+def patches2img(patches, n_y, n_x, stride):
+    """
+    Convert a tensor containing overlapping patches to an image.
+
+    Args:
+      patches: 4d tensor of overlapping patches
+      n_y: number of patches per column
+      n_x: number of patches per row
+      stride: stride
+    Returns:
+      img: output image
+    """
+	cw = int(round(patches.shape[1] ** 0.5))
+	h = pw + (n_y - 1) * stride
+	w = pw + (n_x - 1) * stride
+	img = np.zeros((h, w), dtype=np.float32)
+	mask = 1e-8 + np.ones((h, w), dtype=np.float32)
+
+	ind = 0
+	for i in range(0, h - cw + 1, stride):
+		for j in range(0, w - cw + 1, stride):
+			img[i : i + cw, j : j + cw] += patches[ind, :, :, 0]
+			ind += 1
+			mask[i : i + cw, j : j + cw] += 1.0
+	assert ind == n_y*n_x
+
+	img /= mask
+	return img
