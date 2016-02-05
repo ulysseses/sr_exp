@@ -115,7 +115,7 @@ def ycc2rgb(img_ycc):
 def modcrop(img, modulo):
     """
     Crop `img` s.t. its dimensions are an integer multiple of `modulo`
-
+    
     Args:
       img: image
       modulo: modulo factor
@@ -207,6 +207,76 @@ def _get_filenames(path):
     return fns
 
 
+def _prepare_hdf5(path_h5, n_tr, n_te, n_va, cw, **kwargs):
+    f = h5py.File(path_h5, mode='w')
+    shp = (n_tr + n_te + n_va, cw, cw, 1)
+    split_dict = {
+        'train': {'LR': (0, n_tr), 'HR': (0, n_tr)},
+        'test':  {'LR': (n_tr, n_tr + n_te),
+                  'HR': (n_tr, n_tr + n_te)},
+        'val': {'LR': (n_tr + n_te, n_tr + n_te + n_va),
+                'HR': (n_tr + n_te, n_tr + n_te + n_va)}
+    }
+    f.attrs['split'] = H5PYDataset.create_split_array(split_dict)
+
+    LRh5 = f.create_dataset('LR', shp, dtype=np.float32, **kwargs)
+    HRh5 = f.create_dataset('HR', shp, dtype=np.float32, **kwargs)
+
+    return f, LRh5, HRh5
+
+
+def _chunk_gen(start, stop, chunk_size):
+    for i in range(start, stop, chunk_size):
+        j = min(i + chunk_size, stop)
+        yield i, j
+
+
+def _store_crops(lrs, hrs, img_lr, img_hr, crop_ind, f, LRh5, HRh5,
+                 chunk_size, cw, stride, prune, cutoff=None):
+    crop_ind0 = crop_ind
+    ind = 0
+    for crop_lr, crop_hr in zip(_crop_gen(img_lr, cw, stride),
+                                _crop_gen(img_hr, cw, stride)):
+        if (cutoff and np.var(crop_hr) > cutoff) or prune == 0:
+            lrs[ind] = crop_lr[..., np.newaxis]
+            hrs[ind] = crop_hr[..., np.newaxis]
+            
+            ind += 1
+            crop_ind += 1
+        if crop_ind % chunk_size == 0:
+            LRh5[crop_ind0 : crop_ind] = lrs[:ind]
+            HRh5[crop_ind0 : crop_ind] = hrs[:ind]
+            f.flush()
+            crop_ind0 = crop_ind
+            ind = 0
+    LRh5[crop_ind0 : crop_ind] = lrs[:ind]
+    HRh5[crop_ind0 : crop_ind] = hrs[:ind]
+    f.flush()
+    return crop_ind
+
+
+def _find_cutoff(fns, n, prune, sr, border, cw, stride):
+    # Collect variances
+    X_var = np.empty(n, dtype='float32')
+    ind = 0
+    for fn in fns:
+        img = rgb2ycc(sm.imread(fn))[:, :, 0]  # rgb --> y
+        img = byte2unit(img)
+        img_hr = shave(modcrop(img, sr), border)
+        for crop in _crop_gen(img_hr, cw, stride):
+            X_var[ind] = np.var(crop)
+            ind += 1
+
+    # Find var cutoff point
+    bottom = int(prune * n)
+    cutoff = X_var[np.argpartition(X_var, bottom)[:bottom]].max()
+
+    # Return cutoff & new_n
+    mask = X_var > cutoff
+    new_n = np.sum(mask)
+    return cutoff, new_n
+
+
 def store_hdf5(conf, pp=None, **kwargs):
     """
     Generate crops from images in a directory and store into hdf5. Optionally
@@ -228,7 +298,7 @@ def store_hdf5(conf, pp=None, **kwargs):
       pp (None): if not None, function/lambda to preprocess image
       **kwargs: passed to h5py.File
     """
-    path_h5             = conf['path_h5']
+    path_h5            = conf['path_h5']
     path_tr             = conf['path_tr']
     path_te             = conf['path_te']
     path_va             = conf['path_va']
@@ -251,184 +321,84 @@ def store_hdf5(conf, pp=None, **kwargs):
     fns_tr = _get_filenames(path_tr)
     fns_te = _get_filenames(path_te)
     fns_va = _get_filenames(path_va)
+    
+    #fns_tr = fns_tr[:len(fns_tr) // 16]
+    #fns_te = fns_te[:len(fns_te) // 32]
+    #fns_va = fns_va[:len(fns_va) // 32]
 
-    # Create a resizable h5py Dataset
-    f = h5py.File(path_h5, mode='w')
-    LRh5 = f.create_dataset('LR', (chunk_size, cw, cw, 1), dtype=np.float32,
-                            maxshape=(None, cw, cw, 1))
-    HRh5 = f.create_dataset('HR', (chunk_size, cw, cw, 1), dtype=np.float32,
-                            maxshape=(None, cw, cw, 1))
+    n_tr, n_te, n_va = 0, 0, 0
+    for fn in fns_tr:
+        img = shave(modcrop(sm.imread(fn), sr), border)
+        n_tr += _num_crops(img, cw, stride)
+    for fn in fns_te:
+        img = shave(modcrop(sm.imread(fn), sr), border)
+        n_te += _num_crops(img, cw, stride)  # stride <-- cw
+    for fn in fns_va:
+        img = shave(modcrop(sm.imread(fn), sr), border)
+        n_va += _num_crops(img, cw, stride)  # stride <-- cw
 
-    # Fill up with training data
+    # Prune out low-variance crops
+    if prune > 0:
+        cutoff, n = _find_cutoff(fns_tr, n_tr, prune, sr, border, cw, stride)
+        n_actual = n
+    else:
+        cutoff, n = None, n_tr
+        n_actual = n
+
+    # Prepare fuel/h5py file
+    n_actual = 4*n_actual if augment else n_actual
+    f, LRh5, HRh5 = _prepare_hdf5(path_h5, n_actual, n_te, n_va, cw,
+                                  **kwargs)
+    
+    print("n_tr:", n_actual)
+    print("n_te:", n_te)
+    print("n_va:", n_va)
+    
+    crop_ind = 0
     lrs = np.empty((chunk_size, cw, cw, 1), dtype=np.float32)
     hrs = np.empty((chunk_size, cw, cw, 1), dtype=np.float32)
-    ind_tr = 0
     for fn in fns_tr:
         img = rgb2ycc(sm.imread(fn))[:, :, 0]  # rgb --> y
         img_lr, img_hr = lr_hr(img, sr, border)
         img_lr, img_hr = byte2unit(img_lr), byte2unit(img_hr)
-
-        ind_arr = 0
-        for crop_lr, crop_hr in zip(_crop_gen(img_lr, cw, stride),
-                                    _crop_gen(img_hr, cw, stride)):
-            lrs[ind_arr] = crop_lr[..., np.newaxis]
-            hrs[ind_arr] = crop_hr[..., np.newaxis]
-            ind_arr += 1
-            if ind_arr == chunk_size - 1:
-                LRh5[ind_tr : ind_tr + ind_arr] = lrs[:ind_arr]
-                HRh5[ind_tr : ind_tr + ind_arr] = hrs[:ind_arr]
-                ind_tr += ind_arr
-                ind_arr = 0
-                LRh5.resize(ind_tr + chunk_size, axis=0)
-                HRh5.resize(ind_tr + chunk_size, axis=0)
-                f.flush()
-        LRh5[ind_tr : ind_tr + ind_arr] = lrs[:ind_arr]
-        HRh5[ind_tr : ind_tr + ind_arr] = hrs[:ind_arr]
-        ind_tr += ind_arr
-        ind_arr = 0
-        LRh5.resize(ind_tr + chunk_size, axis=0)
-        HRh5.resize(ind_tr + chunk_size, axis=0)
-        f.flush()
-
-    # Prune
-    if prune > 0:
-        HR_vars = np.empty(ind_tr, dtype=np.float32)
-        for i in range(0, ind_tr, chunk_size):
-            HR_vars[i : i + chunk_size] = np.var(HRh5[i : i + chunk_size],
-                                                 axis=(1, 2, 3))
-        bottom = int(round(prune * n))
-        cutoff = HR_vars[np.argpartition(HR_vars, bottom)[:bottom]].max()
-
-        ind_tr = 0
+        crop_ind = _store_crops(lrs, hrs, img_lr, img_hr, crop_ind, f, LRh5, HRh5,
+                                chunk_size, cw, stride, prune, cutoff)
+    f.flush()
+    assert crop_ind == n
+    
+    # Augment with rotations and flips
+    if augment:
         for fn in fns_tr:
             img = rgb2ycc(sm.imread(fn))[:, :, 0]  # rgb --> y
             img_lr, img_hr = lr_hr(img, sr, border)
             img_lr, img_hr = byte2unit(img_lr), byte2unit(img_hr)
 
-            ind_arr = 0
-            for crop_lr, crop_hr in zip(_crop_gen(img_lr, cw, stride),
-                                        _crop_gen(img_hr, cw, stride)):
-                if np.var(crop_lr) > cutoff:
-                    lrs[ind_arr] = crop_lr[..., np.newaxis]
-                    hrs[ind_arr] = crop_hr[..., np.newaxis]
-                    ind_arr += 1
-                if ind_arr == chunk_size - 1:
-                    LRh5[ind_tr : ind_tr + ind_arr] = lrs[:ind_arr]
-                    HRh5[ind_tr : ind_tr + ind_arr] = hrs[:ind_arr]
-                    ind_tr += ind_arr
-                    ind_arr = 0
-                    LRh5.resize(ind_tr + chunk_size, axis=0)
-                    HRh5.resize(ind_tr + chunk_size, axis=0)
-                    f.flush()
-            LRh5[ind_tr : ind_tr + ind_arr] = lrs[:ind_arr]
-            HRh5[ind_tr : ind_tr + ind_arr] = hrs[:ind_arr]
-            ind_tr += ind_arr
-            ind_arr = 0
-            LRh5.resize(ind_tr + chunk_size, axis=0)
-            HRh5.resize(ind_tr + chunk_size, axis=0)
-            f.flush()
-
-    # Augment
-    if augment:
-        LRh5.resize(ind_tr * 4, axis=0)
-        HRh5.resize(ind_tr * 4, axis=0)
-        for i0, i1, i2, i3 in zip(range(0, ind_tr, chunk_size),
-                                  range(ind_tr, 2*ind_tr, chunk_size),
-                                  range(2*ind_tr, 3*ind_tr, chunk_size),
-                                  range(3*ind_tr, 4*ind_tr, chunk_size)):
-            shp0 = min(chunk_size, ind_tr)
-            lrs[:shp0] = LRh5[i0 : min(i0 + chunk_size, ind_tr)]
-            hrs[:shp0] = HRh5[i0 : min(i0 + chunk_size, ind_tr)]
-
-            aug1_LR = np.transpose(lrs[:shp0, :, :, 0], (0, 2, 1))[..., np.newaxis]
-            aug1_HR = np.transpose(hrs[:shp0, :, :, 0], (0, 2, 1))[..., np.newaxis]
-            aug2_LR = np.fliplr(lrs[:shp0, :, :, 0])[..., np.newaxis]
-            aug2_HR = np.fliplr(hrs[:shp0, :, :, 0])[..., np.newaxis]
-            aug3_LR = np.transpose(np.fliplr(lrs[:shp0, :, :, 0]),
-                                   (0, 2, 1))[..., np.newaxis]
-            aug3_HR = np.transpose(np.fliplr(hrs[:shp0, :, :, 0]),
-                                   (0, 2, 1))[..., np.newaxis]
-
-            LRh5[i1 : min(i1 + chunk_size, 2*ind_tr)] = aug1_LR[:shp0]
-            HRh5[i1 : min(i1 + chunk_size, 2*ind_tr)] = aug1_HR[:shp0]
-            f.flush()
-            LRh5[i2 : min(i2 + chunk_size, 3*ind_tr)] = aug2_LR[:shp0]
-            HRh5[i2 : min(i2 + chunk_size, 3*ind_tr)] = aug2_HR[:shp0]
-            f.flush()
-            LRh5[i3 : min(i3 + chunk_size, 4*ind_tr)] = aug3_LR[:shp0]
-            HRh5[i3 : min(i3 + chunk_size, 4*ind_tr)] = aug3_HR[:shp0]
-            f.flush()
-        ind_tr *= 4
-
-    # Fill up with testing and validation data
-    ind_te = ind_tr
-    for fn in fns_te:
+            aug_lr, aug_hr = np.rot90(img_lr), np.rot90(img_hr)
+            crop_ind = _store_crops(lrs, hrs, aug_lr, aug_hr, crop_ind, f, LRh5, HRh5,
+                                    chunk_size, cw, stride, prune, cutoff)
+            
+            aug_lr, aug_hr = np.flipud(img_lr), np.flipud(img_hr)
+            crop_ind = _store_crops(lrs, hrs, aug_lr, aug_hr, crop_ind, f, LRh5, HRh5,
+                                    chunk_size, cw, stride, prune, cutoff)
+                       
+            aug_lr, aug_hr = np.rot90(np.flipud(img_lr)), np.rot90(np.flipud(img_hr))
+            crop_ind = _store_crops(lrs, hrs, aug_lr, aug_hr, crop_ind, f, LRh5, HRh5,
+                                    chunk_size, cw, stride, prune, cutoff)
+        f.flush()
+        assert crop_ind >= n_actual
+        crop_ind = n_actual
+    
+    for fn in fns_te + fns_va:
         img = rgb2ycc(sm.imread(fn))[:, :, 0]  # rgb --> y
         img_lr, img_hr = lr_hr(img, sr, border)
         img_lr, img_hr = byte2unit(img_lr), byte2unit(img_hr)
-
-        ind_arr = 0
-        for crop_lr, crop_hr in zip(_crop_gen(img_lr, cw, stride),
-                                    _crop_gen(img_hr, cw, stride)):
-            lrs[ind_arr] = crop_lr[..., np.newaxis]
-            hrs[ind_arr] = crop_hr[..., np.newaxis]
-            ind_arr += 1
-            if ind_arr == chunk_size - 1:
-                LRh5[ind_te : ind_te + ind_arr] = lrs[:ind_arr]
-                HRh5[ind_te : ind_te + ind_arr] = hrs[:ind_arr]
-                ind_te += ind_arr
-                ind_arr = 0
-                LRh5.resize(ind_te + chunk_size, axis=0)
-                HRh5.resize(ind_te + chunk_size, axis=0)
-                f.flush()
-        LRh5[ind_te : ind_te + ind_arr] = lrs[:ind_arr]
-        HRh5[ind_te : ind_te + ind_arr] = hrs[:ind_arr]
-        ind_te += ind_arr
-        ind_arr = 0
-        LRh5.resize(ind_te + chunk_size, axis=0)
-        HRh5.resize(ind_te + chunk_size, axis=0)
-        f.flush()
-
-    ind_va = ind_te
-    for fn in fns_va:
-        img = rgb2ycc(sm.imread(fn))[:, :, 0]  # rgb --> y
-        img_lr, img_hr = lr_hr(img, sr, border)
-        img_lr, img_hr = byte2unit(img_lr), byte2unit(img_hr)
-
-        ind_arr = 0
-        for crop_lr, crop_hr in zip(_crop_gen(img_lr, cw, stride),
-                                    _crop_gen(img_hr, cw, stride)):
-            lrs[ind_arr] = crop_lr[..., np.newaxis]
-            hrs[ind_arr] = crop_hr[..., np.newaxis]
-            ind_arr += 1
-            if ind_arr == chunk_size - 1:
-                LRh5[ind_va : ind_va + ind_arr] = lrs[:ind_arr]
-                HRh5[ind_va : ind_va + ind_arr] = hrs[:ind_arr]
-                ind_va += ind_arr
-                ind_arr = 0
-                LRh5.resize(ind_va + chunk_size, axis=0)
-                HRh5.resize(ind_va + chunk_size, axis=0)
-                f.flush()
-        LRh5[ind_va : ind_va + ind_arr] = lrs[:ind_arr]
-        HRh5[ind_va : ind_va + ind_arr] = hrs[:ind_arr]
-        ind_va += ind_arr
-        ind_arr = 0
-        LRh5.resize(ind_va, axis=0)
-        HRh5.resize(ind_va, axis=0)
-        f.flush()
-
-    split_dict = {
-        'train': {'LR': (0, ind_tr), 'HR': (0, ind_tr)},
-        'test': {'LR': (ind_tr, ind_te), 'HR': (ind_tr, ind_te)},
-        'val': {'LR': (ind_te, ind_va), 'HR': (ind_te, ind_va)}
-    }
-    f.attrs['split'] = H5PYDataset.create_split_array(split_dict)
+        crop_ind = _store_crops(lrs, hrs, img_lr, img_hr, crop_ind, f, LRh5, HRh5,
+                                #chunk_size, cw, stride, 0)
+                                chunk_size, cw, stride, 0)
     f.close()
+    assert crop_ind == n_actual + n_te + n_va
     duration = time.time() - start_time
-    print('n_tr:', ind_tr)
-    print('n_te:', ind_te)
-    print('n_va:', ind_va)
-    print('total caching time: %.1f min' % (float(duration) / 60.))
+    print("total caching time: %.1f min" % (float(duration) / 60.))
 
 
 def lr_hr(img, sr, border=3):

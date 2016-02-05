@@ -1,4 +1,5 @@
 # store_hdf5
+path_h5: tmp/data.h5
 path_tmp: tmp/scn
 path_tr: data/Yang
 path_te: data/Set14
@@ -10,13 +11,13 @@ augment: true
 prune: 0.0
 border: 3
 chunk_size: 20000
-data_cached: false
+data_cached: true
 
 # inference
 fw: 5
 pw: 5
 n_chans: 4
-n_c: 256
+n_c: 128
 T: 6
 mw: 7
 cropw: 3
