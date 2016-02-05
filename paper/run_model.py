@@ -226,36 +226,34 @@ def infer(img, Xs, y, sess, conf, save=None):
       hr: inferred image
     """
     cw = conf['cw']
-    stride = cw // 2
+    cropw = conf['cropw']
+    stride = cw - 2*cropw - 1
     mb_size = conf['mb_size']
     path_tmp = conf['path_tmp']
-    cropw = conf['cropw']
 
-    # Bi-cubic up-sample and pre-process
     start_time0 = time.time()
-    lr_ycc = preproc.rgb2ycc(img)
-    lr_y = preproc.byte2unit(lr_ycc[:, :, 0])
-    h0, w0 = lr_y.shape
+    if len(img.shape) == 3 and img.shape[2] == 3:
+        lr_ycc = preproc.byte2unit(preproc.rgb2ycc(img))
+        lr_y = lr_ycc[:, :, 0]
+    elif len(img.shape) == 2:
+        lr_y = preproc.byte2unit(img)
+    else:
+        raise ValueError('img must be RGB or Y')
+
     lr_y = preproc.padcrop(lr_y, cw)
-    h1, w1 = lr_y.shape
-    print("h0, w0:", h0, w0)
-    print("h1, w1:", h1, w1)
+    h0, w0 = img.shape
 
     # Fill into a data array
-    n_y, n_x = preproc._num_crops(lr_y, cw, stride, tup=True)
-    print("n_y, n_x:", n_y, n_x)
-    print("n_y*n_x:", n_y * n_x)
-    crops_in = np.empty((n_y*n_x, cw, cw, 1), dtype='float32')
-    for i, crop in enumerate(preproc._crop_gen(lr_y, cw, stride)):
-        crops_in[i] = crop[..., np.newaxis]
+    n_y, n_x = num_patches(lr_y, conf)
+    crops_in = img2patches(lr_y, conf)
 
     # Infer
-    crops_out = np.empty((n_y*n_x, cw - 2*cropw, cw - 2*cropw, 1), dtype='float32')
+    crops_out = np.empty((n_y*n_x, cw-2*cropw, cw-2*cropw, 1), dtype=np.float32)
     start_time1 = time.time()
     for i in range(0, n_y*n_x, FLAGS.num_gpus * mb_size):
         X_c = crops_in[i : i + FLAGS.num_gpus * mb_size]
         chunk_size0 = X_c.shape[0]
-        
+
         # Handle chunks that are less than number of gpu's
         chunk_size = chunk_size0
         if chunk_size < FLAGS.num_gpus:
@@ -263,10 +261,7 @@ def infer(img, Xs, y, sess, conf, save=None):
             repeats = [1 for _ in range(chunk_size-1)] + [num_repeats]
             X_c = np.repeat(X_c, repeats, axis=0)
             chunk_size = FLAGS.num_gpus
-        
-        print("chunk_size:", chunk_size)
-        print("chunk_size0:", chunk_size0)
-        
+
         gpu_chunk = chunk_size // FLAGS.num_gpus
         dict_input1 = [(Xs[j], X_c[j*gpu_chunk : \
                                    ((j + 1)*gpu_chunk) \
@@ -277,43 +272,25 @@ def infer(img, Xs, y, sess, conf, save=None):
         tmp = sess.run(y, feed_dict=feed)
         crops_out[i : i + chunk_size0] = tmp[:chunk_size0]
     gpu_time = time.time() - start_time1
-    
-    # Fill crops into y channel
-    h2 = cw-2*cropw + (n_y - 1)*stride
-    w2 = cw-2*cropw + (n_x - 1)*stride
-    print("h2, w2:", h2, w2)
-    hr_y = np.zeros((h2, w2), dtype='float32')
-    mask = 1e-8 * np.ones_like(hr_y, dtype='float32')
-    
-    y = 0
-    for i in range(n_y):
-        x = 0
-        for j in range(n_x):
-            hr_y[y : y + cw-2*cropw, x : x + cw-2*cropw] += \
-                crops_out[i*n_x + j, :, :, 0]
-            mask[y : y + cw-2*cropw, x : x + cw-2*cropw] += 1.
-            x += stride
-        y += stride
-    
-    hr_y /= mask
-    hr_y = preproc.unit2byte(hr_y)
 
-    # Combine y with cb & cr, then convert to rgb
-    hr_y = hr_y[:h0 - 2*cropw, :w0 - 2*cropw]
-    #hr_ycc = lr_ycc[cropw:-cropw, cropw:-cropw]
-    hr_ycc = lr_ycc[cropw:, cropw:]
-    print('hr_y.shape:', hr_y.shape)
-    print('hr_ycc.shape:', hr_ycc.shape)
-    
-    min_h = min(hr_y.shape[0], hr_ycc.shape[0])
-    min_w = min(hr_y.shape[1], hr_ycc.shape[1])
+    # Fill crops back into image
+    hr_y = patches2img(crops_out, n_y, n_x, stride)
+
+    # Crop image
+    min_h = min(hr_y.shape[0], img.shape[0] - 2*cropw)
+    min_w = min(hr_y.shape[1], img.shape[1] - 2*cropw)
     hr_y = hr_y[:min_h, :min_w]
-    hr_ycc = hr_ycc[:min_h, :min_w]
-    
-    hr_ycc[:, :, 0] = hr_y
-    hr = preproc.ycc2rgb(hr_ycc)
-    total_time = time.time() - start_time0
-    
+
+    if len(img.shape) == 3:
+        hr_ycc = lr_ycc[cropw:, cropw:][:min_h, :min_w]
+        hr_ycc[:, :, 0] = hr_y
+        hr_ycc = preproc.unit2byte(hr_ycc)
+        hr = preproc.ycc2rgb(hr_ycc)
+        total_time = time.time() - start_time0
+    else:
+        hr = preproc.unit2byte(hr_y)
+        total_time = time.time() - start_time0
+
     print('total time: %.1f | gpu time: %.1f' % (total_time, gpu_time))
 
     # Save
@@ -337,6 +314,7 @@ def eval_te(conf, ckpt):
     cw = conf['cw']
     sr = conf['sr']
     cropw = conf['cropw']
+    save = conf['save_sr_imgs']
     fns_te = preproc._get_filenames(path_te)
     n = len(fns_te)
 
@@ -366,8 +344,9 @@ def eval_te(conf, ckpt):
         bl_tmse = 0
         for fn in fns_te:
             lr, gt = preproc.lr_hr(sm.imread(fn), sr)
-            #a, b = fn.split('.')
-            hr = infer(lr, Xs, y, sess, conf)#, a + '_HR' + b)
+            fn_ = fn.split('/')[-1].split('.')[0]
+            out_name = os.path.join('tmp', fn_, '_HR.png') if save else None
+            hr = infer(lr, Xs, y, sess, conf, out_name)
             # Evaluate
             gt = gt[cropw:, cropw:]
             gt = gt[:hr.shape[0], :hr.shape[1]]
