@@ -1,5 +1,6 @@
+import time
 import yaml
-from scn_victor import run_model
+from paper import run_model
 import tensorflow as tf
 
 tf.app.flags.DEFINE_string('tower_name', 'tower',
@@ -13,20 +14,22 @@ tf.app.flags.DEFINE_boolean('dev_assign', True, "Do assign tf.devices.")
 
 
 def train():
-    with open('scn_victor/conf.yaml', 'r') as f:
+    with open('scn_victor/eval.yaml', 'r') as f:
         conf = yaml.load(f)
     run_model.train(conf)
     
 
 def infer():
-    with open('scn_victor/conf.yaml', 'r') as f:
+    with open('scn_victor/eval.yaml', 'r') as f:
         conf = yaml.load(f)
     ckpt = tf.train.get_checkpoint_state(conf['path_tmp'])
     if ckpt:
         ckpt = ckpt.model_checkpoint_path
+        print('found ckpt: %s' % ckpt)
+        time.sleep(2)
     run_model.eval_te(conf, ckpt)
 
 
 if __name__ == '__main__':
     train()
-    #infer();
+    infer();

@@ -244,8 +244,8 @@ def infer(img, Xs, y, sess, conf, save=None):
     h0, w0 = img.shape
 
     # Fill into a data array
-    n_y, n_x = num_patches(lr_y, conf)
-    crops_in = img2patches(lr_y, conf)
+    n_y, n_x = preproc.num_patches(lr_y, cw, stride)
+    crops_in = preproc.img2patches(lr_y, cw, stride)
 
     # Infer
     crops_out = np.empty((n_y*n_x, cw-2*cropw, cw-2*cropw, 1), dtype=np.float32)
@@ -274,7 +274,7 @@ def infer(img, Xs, y, sess, conf, save=None):
     gpu_time = time.time() - start_time1
 
     # Fill crops back into image
-    hr_y = patches2img(crops_out, n_y, n_x, stride)
+    hr_y = preproc.patches2img(crops_out, n_y, n_x, stride)
 
     # Crop image
     min_h = min(hr_y.shape[0], img.shape[0] - 2*cropw)
@@ -310,7 +310,7 @@ def eval_te(conf, ckpt):
     Returns:
       psnr: psnr of entire test set
     """
-    path_te = conf['path_te']
+    path_te = conf['path_va']
     cw = conf['cw']
     sr = conf['sr']
     cropw = conf['cropw']
@@ -345,7 +345,7 @@ def eval_te(conf, ckpt):
         for fn in fns_te:
             lr, gt = preproc.lr_hr(sm.imread(fn), sr)
             fn_ = fn.split('/')[-1].split('.')[0]
-            out_name = os.path.join('tmp', fn_, '_HR.png') if save else None
+            out_name = os.path.join('tmp', fn_ + '_HR.png') if save else None
             hr = infer(lr, Xs, y, sess, conf, out_name)
             # Evaluate
             gt = gt[cropw:, cropw:]

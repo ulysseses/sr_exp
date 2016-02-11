@@ -156,7 +156,7 @@ def padcrop(img, modulo):
     ```
     """
     h, w = img.shape[0], img.shape[1]
-    h2, w2 = np.ceil(h / modulo) * modulo, np.ceil(w / modulo) * modulo
+    h2, w2 = int(np.ceil(h / modulo)) * modulo, int(np.ceil(w / modulo)) * modulo
     shp2 = list(img.shape)
     shp2[0] = h2
     shp2[1] = w2
@@ -440,8 +440,8 @@ def store_hdf5(conf, pp=None, **kwargs):
     f.close()
     duration = time.time() - start_time
     print('n_tr:', ind_tr)
-    print('n_te:', ind_te)
-    print('n_va:', ind_va)
+    print('n_te:', ind_te - ind_tr)
+    print('n_va:', ind_va - ind_te)
     print('total caching time: %.1f min' % (float(duration) / 60.))
 
 
@@ -462,50 +462,48 @@ def lr_hr(img, sr, border=3):
     return img_lr, img_hr
 
 
-def num_patches(img, conf):
+def num_patches(img, cw, stride):
     """
     Calculate the number of patches in H/V directions.
 
     Args:
       img: image
-      conf: configuration dictionary
+      cw: crop width
+      stride: stride
     Returns:
       n_y: number of patches per column
       n_x: number of patches per row
     """
-    cw = conf['cw']
-	stride = conf['stride']
     h, w = img.shape[:2]
-	n_y = len(range(0, h - cw + 1, stride))
-	n_x = len(range(0, w - cw + 1, stride))
-	return n_y, n_x
+    n_y = len(range(0, h - cw + 1, stride))
+    n_x = len(range(0, w - cw + 1, stride))
+    return n_y, n_x
 
 
-def img2patches(img, conf):
+def img2patches(img, cw, stride):
     """
     Convert an image to a tensor containing overlapping patches.
 
     Args:
       img: image
-      conf: configuration dictionary
+      cw: crop width
+      stride: stride
     Returns:
       patches: 4d tensor of overlapping patches
     """
-    cw = conf['cw']
-	stride = conf['stride']
     h, w = img.shape[:2]
-	n_y = len(range(0, h - cw + 1, stride))
-	n_x = len(range(0, w - cw + 1, stride))
-	patches = np.empty((n_y*n_x, cw, cw, 1), dtype=np.float32)
+    n_y = len(range(0, h - cw + 1, stride))
+    n_x = len(range(0, w - cw + 1, stride))
+    patches = np.empty((n_y*n_x, cw, cw, 1), dtype=np.float32)
 
-	ind = 0
-	for i in range(0, h - pw + 1, stride):
-		for j in range(0, w - pw + 1, stride):
-			patches[ind] = img[i : i + pw, j : j + pw, np.newaxis]
-			ind += 1
-	assert ind == n_y*n_x
+    ind = 0
+    for i in range(0, h - cw + 1, stride):
+        for j in range(0, w - cw + 1, stride):
+            patches[ind] = img[i : i + cw, j : j + cw, np.newaxis]
+            ind += 1
+    assert ind == n_y*n_x
 
-	return patches
+    return patches
 
 
 def patches2img(patches, n_y, n_x, stride):
@@ -520,19 +518,19 @@ def patches2img(patches, n_y, n_x, stride):
     Returns:
       img: output image
     """
-	cw = int(round(patches.shape[1] ** 0.5))
-	h = pw + (n_y - 1) * stride
-	w = pw + (n_x - 1) * stride
-	img = np.zeros((h, w), dtype=np.float32)
-	mask = 1e-8 + np.ones((h, w), dtype=np.float32)
+    cw = patches.shape[1]
+    h = cw + (n_y - 1) * stride
+    w = cw + (n_x - 1) * stride
+    img = np.zeros((h, w), dtype=np.float32)
+    mask = 1e-8 * np.ones((h, w), dtype=np.float32)
 
-	ind = 0
-	for i in range(0, h - cw + 1, stride):
-		for j in range(0, w - cw + 1, stride):
-			img[i : i + cw, j : j + cw] += patches[ind, :, :, 0]
-			ind += 1
-			mask[i : i + cw, j : j + cw] += 1.0
-	assert ind == n_y*n_x
+    ind = 0
+    for i in range(0, h - cw + 1, stride):
+        for j in range(0, w - cw + 1, stride):
+            img[i : i + cw, j : j + cw] += patches[ind, :, :, 0]
+            ind += 1
+            mask[i : i + cw, j : j + cw] += 1.0
+    assert ind == n_y*n_x
 
-	img /= mask
-	return img
+    img /= mask
+    return img
