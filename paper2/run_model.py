@@ -298,13 +298,12 @@ def infer(img, Xs, y, sess, conf, save=None):
     return hr
 
 
-def eval_te(conf, ckpt):
+def eval_te(conf):
     """
     Evaluate against the entire test set of images.
 
     Args:
       conf: configuration dictionary
-      ckpt: checkpoint path
     Returns:
       psnr: psnr of entire test set
     """
@@ -335,7 +334,15 @@ def eval_te(conf, ckpt):
         sess = tf.Session(config=tf.ConfigProto(
             allow_soft_placement=True,
             log_device_placement=FLAGS.log_device_placement))
-        saver.restore(sess, ckpt)
+            
+        ckpt = tf.train.get_checkpoint_state(conf['path_tmp'])
+        if ckpt:
+            ckpt = ckpt.model_checkpoint_path
+            print('checkpoint found: %s' % ckpt)
+            saver.restore(sess, ckpt)
+        else:
+            print('checkpoint not found!')
+        time.sleep(2)
 
         # Iterate over each image, and calculate error
         tmse = 0

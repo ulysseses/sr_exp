@@ -14,36 +14,29 @@ tf.app.flags.DEFINE_boolean('log_device_placement', False,
 tf.app.flags.DEFINE_integer('num_gpus', 4, "How many GPUs to use.")
 tf.app.flags.DEFINE_boolean('dev_assign', True, "Do assign tf.devices.")
 
-tf.app.flags.DEFINE_string('command', 'train', "train or infer")
-tf.app.flags.DEFINE_string('path_conf', 'paper2/a.yaml',
-    "Path to configuration file.")
 
-
-def train(path):
-    with open(path, 'r') as f:
+def main():
+    template_conf_path = "paper2/template.yaml"
+    with open(template_conf_path, 'r') as f:
         conf = yaml.load(f)
-    run_model.train(conf)
     
-
-def infer(path):
-    with open(path, 'r') as f:
-        conf = yaml.load(f)
-    ckpt = tf.train.get_checkpoint_state(conf['path_tmp'])
-    if ckpt:
-        ckpt = ckpt.model_checkpoint_path
-        print('found ckpt: %s' % ckpt)
-        time.sleep(2)
-    run_model.eval_h5(conf, ckpt)
-    time.sleep(2)
-    run_model.eval_te(conf, ckpt)
+    Ts = [1, 2, 4, 8]
+    Cs = [16, 32, 64, 128]
+    Ks = [10, 20, 50, 100]
+    grid = [(T, C, K) for T in Ts for C in Cs for K in Ks if K <= C]
+    budget = 128 * 8 * 32
+    for T, C, K in grid:
+        conf['T'] = T
+        conf['n_c'] = C
+        conf['e_rank'] = K
+        conf['mb_size'] = budget / (T * C)
+        conf['path_tmp'] = 'tmp/%03d_%03d_%03d' % (T, C, K)
+        run_model.train(conf)
+        psnr, bl_psnr = run_model.eval_te(conf)
+        with open('notes/log.txt', 'a') as f:
+            f.write('T: %03d C: %03d K: %03d PSNR: %.2f (%.2f)\n' % \
+                    (T, C, K, psnr, bl_psnr))
 
 
 if __name__ == '__main__':
-    command = FLAGS.command
-    path = FLAGS.path_conf
-    if command[:2].lower() == 'tr':
-        train(path)
-    elif command[:2].lower() == 'in':
-        infer(path)
-    else:
-        raise ValueError('command %s not recognized' % command)
+    main()
