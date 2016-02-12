@@ -165,27 +165,27 @@ def padcrop(img, modulo):
     return img2
 
 
-def _crop_gen(img, cw, s):
+def _crop_gen(img, iw, s):
     """
     Generate a strided series of cropped patches from an image.
 
     Args:
       img: image
-      cw: crop width
+      iw: crop width
       s: stride
 
     Yields:
       crop: 2d cropped region of `img`
     """
-    for i in range(0, img.shape[0] - cw + 1, s):
-        for j in range(0, img.shape[1] - cw + 1, s):
-            crop = img[i : i + cw, j : j + cw]
+    for i in range(0, img.shape[0] - iw + 1, s):
+        for j in range(0, img.shape[1] - iw + 1, s):
+            crop = img[i : i + iw, j : j + iw]
             yield crop
 
 
-def _num_crops(img, cw, s, tup=False):
+def _num_crops(img, iw, s, tup=False):
     h, w = img.shape[0], img.shape[1]
-    n_y, n_x = len(range(0, h - cw + 1, s)), len(range(0, w - cw + 1, s))
+    n_y, n_x = len(range(0, h - iw + 1, s)), len(range(0, w - iw + 1, s))
     if tup:
         return n_y, n_x
     else:
@@ -216,7 +216,7 @@ def store_hdf5(conf, pp=None, **kwargs):
         path_tr: path to training images
         path_te: path to testing images
         path_va: path to validation images
-        cw: crop width
+        iw: crop width
         stride: stride
         sr: resize/super-resolution factor
         border: how much to shave off before resizing down `img_hr` --> `img_lr`
@@ -230,7 +230,7 @@ def store_hdf5(conf, pp=None, **kwargs):
     path_tr             = conf['path_tr']
     path_te             = conf['path_te']
     path_va             = conf['path_va']
-    cw                  = conf['cw']
+    iw                  = conf['iw']
     stride              = conf['stride']
     sr                  = conf['sr']
     augment             = conf['augment']
@@ -252,14 +252,14 @@ def store_hdf5(conf, pp=None, **kwargs):
 
     # Create a resizable h5py Dataset
     f = h5py.File(path_h5, mode='w')
-    LRh5 = f.create_dataset('LR', (chunk_size, cw, cw, 1), dtype=np.float32,
-                            maxshape=(None, cw, cw, 1))
-    HRh5 = f.create_dataset('HR', (chunk_size, cw, cw, 1), dtype=np.float32,
-                            maxshape=(None, cw, cw, 1))
+    LRh5 = f.create_dataset('LR', (chunk_size, iw, iw, 1), dtype=np.float32,
+                            maxshape=(None, iw, iw, 1))
+    HRh5 = f.create_dataset('HR', (chunk_size, iw, iw, 1), dtype=np.float32,
+                            maxshape=(None, iw, iw, 1))
 
     # Fill up with training data
-    lrs = np.empty((chunk_size, cw, cw, 1), dtype=np.float32)
-    hrs = np.empty((chunk_size, cw, cw, 1), dtype=np.float32)
+    lrs = np.empty((chunk_size, iw, iw, 1), dtype=np.float32)
+    hrs = np.empty((chunk_size, iw, iw, 1), dtype=np.float32)
     ind_tr = 0
     for fn in fns_tr:
         img = sm.imread(fn)
@@ -271,8 +271,8 @@ def store_hdf5(conf, pp=None, **kwargs):
         img_lr, img_hr = byte2unit(img_lr), byte2unit(img_hr)
 
         ind_arr = 0
-        for crop_lr, crop_hr in zip(_crop_gen(img_lr, cw, stride),
-                                    _crop_gen(img_hr, cw, stride)):
+        for crop_lr, crop_hr in zip(_crop_gen(img_lr, iw, stride),
+                                    _crop_gen(img_hr, iw, stride)):
             lrs[ind_arr] = crop_lr[..., np.newaxis]
             hrs[ind_arr] = crop_hr[..., np.newaxis]
             ind_arr += 1
@@ -312,8 +312,8 @@ def store_hdf5(conf, pp=None, **kwargs):
             img_lr, img_hr = byte2unit(img_lr), byte2unit(img_hr)
 
             ind_arr = 0
-            for crop_lr, crop_hr in zip(_crop_gen(img_lr, cw, stride),
-                                        _crop_gen(img_hr, cw, stride)):
+            for crop_lr, crop_hr in zip(_crop_gen(img_lr, iw, stride),
+                                        _crop_gen(img_hr, iw, stride)):
                 if np.var(crop_lr) > cutoff:
                     lrs[ind_arr] = crop_lr[..., np.newaxis]
                     hrs[ind_arr] = crop_hr[..., np.newaxis]
@@ -378,8 +378,8 @@ def store_hdf5(conf, pp=None, **kwargs):
         img_lr, img_hr = byte2unit(img_lr), byte2unit(img_hr)
 
         ind_arr = 0
-        for crop_lr, crop_hr in zip(_crop_gen(img_lr, cw, stride),
-                                    _crop_gen(img_hr, cw, stride)):
+        for crop_lr, crop_hr in zip(_crop_gen(img_lr, iw, stride),
+                                    _crop_gen(img_hr, iw, stride)):
             lrs[ind_arr] = crop_lr[..., np.newaxis]
             hrs[ind_arr] = crop_hr[..., np.newaxis]
             ind_arr += 1
@@ -410,8 +410,8 @@ def store_hdf5(conf, pp=None, **kwargs):
         img_lr, img_hr = byte2unit(img_lr), byte2unit(img_hr)
 
         ind_arr = 0
-        for crop_lr, crop_hr in zip(_crop_gen(img_lr, cw, stride),
-                                    _crop_gen(img_hr, cw, stride)):
+        for crop_lr, crop_hr in zip(_crop_gen(img_lr, iw, stride),
+                                    _crop_gen(img_hr, iw, stride)):
             lrs[ind_arr] = crop_lr[..., np.newaxis]
             hrs[ind_arr] = crop_hr[..., np.newaxis]
             ind_arr += 1
@@ -462,41 +462,41 @@ def lr_hr(img, sr, border=3):
     return img_lr, img_hr
 
 
-def num_patches(img, cw, stride):
+def num_patches(img, iw, stride):
     """
     Calculate the number of patches in H/V directions.
 
     Args:
       img: image
-      cw: crop width
+      iw: crop width
       stride: stride
     Returns:
       n_y: number of patches per column
       n_x: number of patches per row
     """
     h, w = img.shape[:2]
-    n_y = len(range(0, h - cw + 1, stride))
-    n_x = len(range(0, w - cw + 1, stride))
+    n_y = len(range(0, h - iw + 1, stride))
+    n_x = len(range(0, w - iw + 1, stride))
     return n_y, n_x
 
 
-def img2patches(img, cw, stride):
+def img2patches(img, iw, stride):
     """
     Convert an image to a tensor containing overlapping patches.
 
     Args:
       img: image
-      cw: crop width
+      iw: crop width
       stride: stride
     Returns:
       patches: 4d tensor of overlapping patches
     """
     h, w = img.shape[:2]
-    n_y = len(range(0, h - cw + 1, stride))
-    n_x = len(range(0, w - cw + 1, stride))
-    patches = np.empty((n_y*n_x, cw, cw, 1), dtype=np.float32)
+    n_y = len(range(0, h - iw + 1, stride))
+    n_x = len(range(0, w - iw + 1, stride))
+    patches = np.empty((n_y*n_x, iw, iw, 1), dtype=np.float32)
     
-    for ind, crop in enumerate(_crop_gen(img, cw, stride)):
+    for ind, crop in enumerate(_crop_gen(img, iw, stride)):
         patches[ind] = crop[..., np.newaxis]
     assert ind == n_y*n_x
 
@@ -515,18 +515,18 @@ def patches2img(patches, n_y, n_x, stride):
     Returns:
       img: output image
     """
-    cw = patches.shape[1]
-    h = cw + (n_y - 1) * stride
-    w = cw + (n_x - 1) * stride
+    iw = patches.shape[1]
+    h = iw + (n_y - 1) * stride
+    w = iw + (n_x - 1) * stride
     img = np.zeros((h, w), dtype=np.float32)
     mask = 1e-8 * np.ones((h, w), dtype=np.float32)
 
     ind = 0
-    for i in range(0, h - cw + 1, stride):
-        for j in range(0, w - cw + 1, stride):
-            img[i : i + cw, j : j + cw] += patches[ind, :, :, 0]
+    for i in range(0, h - iw + 1, stride):
+        for j in range(0, w - iw + 1, stride):
+            img[i : i + iw, j : j + iw] += patches[ind, :, :, 0]
             ind += 1
-            mask[i : i + cw, j : j + cw] += 1.0
+            mask[i : i + iw, j : j + iw] += 1.0
     assert ind == n_y*n_x
 
     img /= mask

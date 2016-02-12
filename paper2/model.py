@@ -286,7 +286,7 @@ def inference(x, conf):
     n_chans = conf['n_chans']
     n_c = conf['n_c']
     T = conf['T']
-    cropw = conf['cropw']
+    cw = conf['cw']
     mw = conf['mw']
     thresh0 = conf['thresh0']
     subnet_name = conf['subnet_name'].lower()
@@ -389,8 +389,8 @@ def inference(x, conf):
     
     # Crop to remove convolution boundary effects
     with tf.name_scope('crop'):
-        crop_begin = [0, cropw, cropw, 0]
-        crop_size = tf.pack([-1, h - 2*cropw, w - 2*cropw, 1])
+        crop_begin = [0, cw, cw, 0]
+        crop_size = tf.pack([-1, h - 2*cw, w - 2*cw, 1])
         pred_crop = tf.slice(pred0, crop_begin, crop_size, name='pred_crop')
     
     pred = tf.identity(pred_crop, name='pred')
