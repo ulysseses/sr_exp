@@ -224,7 +224,10 @@ float lista() {
 	// Allocate HR dictionary
 	float *dict_hr = (float*)malloc(C*F*sizeof(float));
 	// Allocate S matrix
-	float *s = (float*)malloc(C*C*sizeof(float));
+	//float *s = (float*)malloc(C*C*sizeof(float));
+	float *s1 = (float*)malloc(C*(C/4)*sizeof(float));
+	float *s2 = (float*)malloc((C/4)*C*sizeof(float));
+	float *tmp = (float*)malloc(N*(C/4)*sizeof(float));
 	
 	// Allocate B
 	float *b = (float*)malloc(N*C*sizeof(float));
@@ -238,7 +241,9 @@ float lista() {
 	dot(patches, dict_lr, b, N, K, C);
 	st(b, z, N, C, THRESH);
 	for (int t=1; t<=T; t++) {
-		dot(z, s, c, N, C, C);
+		//dot(z, s, c, N, C, C);
+		dot(z, s1, tmp, N, C, C/4);
+		dot(tmp, s2, c, N, C/4, C);
 		add(b, c, c, N, C);
 		st(c, z, N, C, THRESH);
 	}
@@ -254,7 +259,10 @@ float lista() {
 	free(patches_sr);
 	free(dict_lr);
 	free(dict_hr);
-	free(s);
+	//free(s);
+	free(s1);
+	free(s2);
+	free(tmp);
 	free(b);
 	free(z);
 	free(c);
