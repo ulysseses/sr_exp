@@ -314,7 +314,6 @@ def eval_te(conf, ckpt):
     cw = conf['cw']
     sr = conf['sr']
     cropw = conf['cropw']
-    save = conf['save_sr_imgs']
     fns_te = preproc._get_filenames(path_te)
     n = len(fns_te)
 
@@ -345,8 +344,7 @@ def eval_te(conf, ckpt):
         for fn in fns_te:
             lr, gt = preproc.lr_hr(sm.imread(fn), sr)
             fn_ = fn.split('/')[-1].split('.')[0]
-            out_name = os.path.join('tmp', fn_ + '_HR.png') if save else None
-            hr = infer(lr, Xs, y, sess, conf, out_name)
+            hr = infer(lr, Xs, y, sess, conf)
             # Evaluate
             gt = gt[cropw:, cropw:]
             gt = gt[:hr.shape[0], :hr.shape[1]]
