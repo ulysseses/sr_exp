@@ -1,14 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-
-#ifdef USE_OPENMP
 #include <omp.h>
-#endif
-
-#ifdef USE_OPENBLAS
 #include <cblas.h>
-#endif
 
 int const F = 36;
 int const N = 18800;
@@ -116,7 +110,7 @@ int greedy_k(float *x, int m, int n) {
 
 void outer_update(float *x, float *y, float *z, int m, int n, int k) {
 	#ifdef USE_OPENBLAS
-	cblas_sger(CblasColOrder, m, n, 1.0, &x[k*m], 1, &y[k*m], 1, z, m);
+	cblas_sger(CblasColMajor, m, n, 1.0, &x[k*m], 1, &y[k*m], 1, z, m);
 	#else
 	#ifdef USE_OPENMP
 	#pragma omp parallel for collapse(2)
@@ -185,7 +179,8 @@ double a_plus() {
 		}
 		#endif
 	}
-	double duration = omp_get_wtime();
+	
+	double duration = omp_get_wtime() - start_time;
 	
 	// Deallocate
 	free(patches);
@@ -222,7 +217,7 @@ double lcod() {
 	// Perform Coordinate Descent
 	double start_time = omp_get_wtime();
 	dot(patches, dict_lr, b, N, K, C);
-	for (int t=0; t<T; t++) {
+	for (int t=0; t<T-1; t++) {
 		st(b, z_hat, N, C, THRESH);
 		int k;
 		if (t > 1) {
@@ -239,7 +234,8 @@ double lcod() {
 	
 	// Project back to HR space
 	dot(z, dict_hr, patches_sr, N, C, F);
-	double duration = omp_get_wtime();
+	
+	double duration = omp_get_wtime() - start_time;
 	
 	// De-allocate
 	free(patches);
@@ -289,7 +285,8 @@ double lista() {
 	
 	// Project back to HR space
 	dot(z, dict_hr, patches_sr, N, C, F);
-	double duration = omp_get_wtime();
+	
+	double duration = omp_get_wtime() - start_time;
 
 	// Deallocate
 	free(patches);
@@ -307,20 +304,18 @@ double lista() {
 }
 
 int main(int argc, char* argv[]) {
-	if (argc != 2) {
-		fprintf(stderr, "Error in usage: %s file_name\n", argv[0]);
-		return 1;
-	}
-	char *file_name = argv[1];
-	
+	char *file_name;
 	FILE *pFile;
-	pFile = fopen(file_name, "w");
+	if (argc > 1) {
+		file_name = argv[1];
+		pFile = fopen(file_name, "w");
+	}
 
 	int Ts[4] = {1, 2, 4, 8};
 	int Cs[4] = {16, 32, 64, 128};
 	int Ks[4] = {10, 20, 50, 100};
 
-	int const times = 2;
+	int const times = 5;
 	for (int it=0; it<4; it++) {
 		for (int ic=0; ic<4; ic++) {
 			for (int ik=0; ik<4; ik++) {
@@ -342,14 +337,16 @@ int main(int argc, char* argv[]) {
 				duration_lista /= times;
 				printf("T: %03d C: %03d K: %03d duration (A+/LCoD/LISTA): (%.4f/%.4f/%.4f)\n",
 					   T, C, K, duration_a_plus, duration_lcod, duration_lista);
-				fprintf(pFile,
-						"T: %03d C: %03d K: %03d duration (A+/LCoD/LISTA): (%.4f/%.4f/%.4f)\n",
-						T, C, K, duration_a_plus, duration_lcod, duration_lista);
+			   	if (argc > 1) {
+					fprintf(pFile,
+							"T: %03d C: %03d K: %03d duration (A+/LCoD/LISTA): (%.4f/%.4f/%.4f)\n",
+							T, C, K, duration_a_plus, duration_lcod, duration_lista);
+			   	}
 			}
 		}
 	}
-
-	fclose(pFile);
+	
+	if (argc > 1) fclose(pFile);
 
 	return 0;
 }
