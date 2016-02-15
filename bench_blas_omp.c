@@ -1,33 +1,56 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <omp.h>
 #include <math.h>
-#include <time.h>
+
+#ifdef USE_OPENMP
+#include <omp.h>
+#endif
+
+#ifdef USE_OPENBLAS
 #include <cblas.h>
+#endif
 
-
-int F = 36;
-int N = 18800;
-float THRESH = 0.1;
+int const F = 36;
+int const N = 18800;
+float const THRESH = 0.1;
 int T;
 int C;
 int K;
 
 
 void dot(float *x, float *y, float *z, int m, int n, int p) {
+	#ifdef USE_OPENBLAS
 	cblas_sgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, m, p, n, 1.0, x, m, y,
 				n, 0.0, z, m);
+	#else
+	#ifdef USE_OPENMP
+	#pragma omp parallel for collapse(2)
+	#endif
+	for (int i=0; i<m; i++) {
+		for (int k=0; k<p; k++) {
+			float acc = 0;
+			for (int j=0; j<n; j++) {
+				acc += x[i*n+j] * y[n*p+k];
+			}
+			z[i*p+k] = acc;
+		}
+	}
+	#endif
 }
 
 void arr_abs(float *x, int m, int n) {
+	#ifdef USE_OPENMP
 	#pragma omp parallel for
+	#endif
 	for (int ind=0; ind<m*n; ind++) {
 		x[ind] = fabsf(x[ind]);
 	}
 }
 
 void nearest_atoms(float *similarities, int *inds, int m, int n) {
+	#ifdef USE_OPENMP
 	#pragma omp parallel for
+	#endif
 	for (int i=0; i<m; i++) {
 		int best_ind = -1;
 		float best_val = -1;
@@ -43,7 +66,9 @@ void nearest_atoms(float *similarities, int *inds, int m, int n) {
 }
 
 void st(float *x, float *y, int m, int n, float thresh) {
+	#ifdef USE_OPENMP
 	#pragma omp parallel for
+	#endif
 	for (int ind=0; ind<m*n; ind++) {
 		float v = x[ind];
 		y[ind] = ((float)((v > 0) - (v < 0))) * fmaxf(v - thresh, 0);
@@ -51,7 +76,9 @@ void st(float *x, float *y, int m, int n, float thresh) {
 }
 
 void sub(float *a, float *b, float *c, int m, int n) {
+	#ifdef USE_OPENMP
 	#pragma omp parallel for
+	#endif
 	for (int ind=0; ind<m*n; ind++) {
 		c[ind] = a[ind] - b[ind];
 	}
@@ -59,56 +86,68 @@ void sub(float *a, float *b, float *c, int m, int n) {
 
 
 int greedy_k(float *x, int m, int n) {
-	omp_lock_t lock;
-	omp_init_lock(&lock);
-	
 	int best_k = -1;
 	float best_val = -1;
 	
+	#ifdef USE_OPENMP
 	#pragma omp parallel for
+	#endif
 	for (int j=0; j<n; j++) {
 		float acc = 0;
 		for (int i=0; i<m; i++)
 			acc += fabsf(x[i*n+j]);
-			
-		omp_set_lock(&lock);
-		if ((best_k == -1) || (acc > best_val)) {
-			best_k = j;
-			best_val = acc;
+		
+		#ifdef USE_OPENMP
+		#pragma omp critical(check_best)
+		{
+		#endif
+			if ((best_k == -1) || (acc > best_val)) {
+				best_k = j;
+				best_val = acc;
+			}
+		#ifdef USE_OPENMP
 		}
-		omp_unset_lock(&lock);
+		#endif
 	
 	}
-	
-	omp_destroy_lock(&lock);
 	
 	return best_k;
 }
 
 void outer_update(float *x, float *y, float *z, int m, int n, int k) {
+	#ifdef USE_OPENBLAS
+	cblas_sger(CblasColOrder, m, n, 1.0, &x[k*m], 1, &y[k*m], 1, z, m);
+	#else
+	#ifdef USE_OPENMP
 	#pragma omp parallel for collapse(2)
+	#endif
 	for (int i=0; i<m; i++) {
 		for (int j=0; j<n; j++) {
 			z[i*n+j] += x[i*n+k]*y[k*n+j];
 		}
 	}
+	#endif
 }
 
 void slice_update(float *z, float *z_hat, int m, int n, int k) {
+	#ifdef USE_OPENMP
 	#pragma omp parallel for
+	#endif
 	for (int i=0; i<m; i++) {
 		z[i*n+k] = z_hat[i*n+k];
 	}
 }
 
 void add(float *a, float *b, float *c, int m, int n) {
+	#ifdef USE_OPENMP
 	#pragma omp parallel for
+	#endif
 	for (int ind=0; ind<m*n; ind++) {
 		c[ind] = a[ind] + b[ind];
 	}
 }
 
-float a_plus() {
+double a_plus() {
 	// Allocate patches
 	float *patches = (float*)malloc(N*K*sizeof(float));
 	// Allocate patches_sr
@@ -123,7 +162,7 @@ float a_plus() {
 	float *similarities = (float*)malloc(N*C*sizeof(float));
 	
 	// Calculate nearest dictionary atoms
-	float start_time = (float)clock() / CLOCKS_PER_SEC;
+	double start_time = omp_get_wtime();
 	dot(patches, dict_lr, similarities, N, K, C);
 	arr_abs(similarities, N, C);
 	nearest_atoms(similarities, nn_inds, N, C);
@@ -131,16 +170,22 @@ float a_plus() {
 	// Project back to HR space
 	for (int n=0; n<N; n++) {
 		int ind = nn_inds[n];
-		//for (int f=0; f<F; f++) {
-		//	float acc = 0;
-		//	for (int k=0; k<K; k++)
-		//		acc += patches[n*K+k] * projs[ind*K*F+k*F+f];
-		//	patches_sr[n*F+f] = acc;
-		//}
+		#ifdef USE_OPENBLAS
 		cblas_sgemv(CblasColMajor, CblasTrans, K, F, 1.0, &projs[ind*K*F], K,
 					&patches[n*K], 1, 0.0, &patches_sr[n*F], 1);
+		#else
+		#ifdef USE_OPENMP
+		#pragma omp parallel for
+		#endif
+		for (int f=0; f<F; f++) {
+			float acc = 0;
+			for (int k=0; k<K; k++)
+				acc += patches[n*K+k] * projs[ind*K*F+k*F+f];
+			patches_sr[n*F+f] = acc;
+		}
+		#endif
 	}
-	float duration = (float)clock() / CLOCKS_PER_SEC - start_time;
+	double duration = omp_get_wtime();
 	
 	// Deallocate
 	free(patches);
@@ -153,7 +198,7 @@ float a_plus() {
 	return duration;
 }
 
-float lcod() {
+double lcod() {
 	// Allocate patches
 	float *patches = (float*)malloc(N*K*sizeof(float));
 	// Allocate patches_sr
@@ -175,7 +220,7 @@ float lcod() {
 	float *tmp = (float*)malloc(N*C*sizeof(float));
 	
 	// Perform Coordinate Descent
-	float start_time = (float)clock() / CLOCKS_PER_SEC;
+	double start_time = omp_get_wtime();
 	dot(patches, dict_lr, b, N, K, C);
 	for (int t=0; t<T; t++) {
 		st(b, z_hat, N, C, THRESH);
@@ -194,7 +239,7 @@ float lcod() {
 	
 	// Project back to HR space
 	dot(z, dict_hr, patches_sr, N, C, F);
-	float duration = (float)clock() / CLOCKS_PER_SEC - start_time;
+	double duration = omp_get_wtime();
 	
 	// De-allocate
 	free(patches);
@@ -210,7 +255,7 @@ float lcod() {
 	return duration;
 }
 
-float lista() {
+double lista() {
 	// Allocate patches
 	float *patches = (float*)malloc(N*K*sizeof(float));
 	// Allocate patches_sr
@@ -232,7 +277,7 @@ float lista() {
 	float *c = (float*)malloc(N*C*sizeof(float));
 	
 	// Perform Iterated Shrinkage-Thresholding
-	float start_time = (float)clock() / CLOCKS_PER_SEC;
+	double start_time = omp_get_wtime();
 	dot(patches, dict_lr, b, N, K, C);
 	st(b, z, N, C, THRESH);
 	for (int t=1; t<=T; t++) {
@@ -244,7 +289,7 @@ float lista() {
 	
 	// Project back to HR space
 	dot(z, dict_hr, patches_sr, N, C, F);
-	float duration = (float)clock() / CLOCKS_PER_SEC - start_time;
+	double duration = omp_get_wtime();
 
 	// Deallocate
 	free(patches);
@@ -261,13 +306,15 @@ float lista() {
 	return duration;
 }
 
-int main(void) {
-	float duration_a_plus = 0;
-	float duration_lcod = 0;
-	float duration_lista = 0;
-
+int main(int argc, char* argv[]) {
+	if (argc != 2) {
+		fprintf(stderr, "Error in usage: %s file_name\n", argv[0]);
+		return 1;
+	}
+	char *file_name = argv[1];
+	
 	FILE *pFile;
-	pFile = fopen("log.txt", "w");
+	pFile = fopen(file_name, "w");
 
 	int Ts[4] = {1, 2, 4, 8};
 	int Cs[4] = {16, 32, 64, 128};
@@ -280,11 +327,11 @@ int main(void) {
 				T = Ts[it];
 				C = Cs[ic];
 				K = Ks[ik];
-				if (K > C) continue;
+				//if (K > C) continue;
 
-				float duration_a_plus = 0;
-				float duration_lcod = 0;
-				float duration_lista = 0;
+				double duration_a_plus = 0;
+				double duration_lcod = 0;
+				double duration_lista = 0;
 				for (int ind=0; ind<times; ind++) {
 					duration_a_plus += a_plus();
 					duration_lcod += lcod();
@@ -293,10 +340,10 @@ int main(void) {
 				duration_a_plus /= times;
 				duration_lcod /= times;
 				duration_lista /= times;
-				printf("T: %03d C: %03d K: %03d duration (A+/LCoD/LISTA): (%.3f/%.3f/%.3f)\n",
+				printf("T: %03d C: %03d K: %03d duration (A+/LCoD/LISTA): (%.4f/%.4f/%.4f)\n",
 					   T, C, K, duration_a_plus, duration_lcod, duration_lista);
 				fprintf(pFile,
-						"T: %03d C: %03d K: %03d duration (A+/LCoD/LISTA): (%.3f/%.3f/%.3f)\n",
+						"T: %03d C: %03d K: %03d duration (A+/LCoD/LISTA): (%.4f/%.4f/%.4f)\n",
 						T, C, K, duration_a_plus, duration_lcod, duration_lista);
 			}
 		}
