@@ -1,14 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <time.h>
+#include <omp.h>
 
-int F = 36;
-int N = 18800;
-float THRESH = 0.1;
-int T = 2;
-int C = 16;
-int K = 28;
+int const F = 36;
+int const N = 18800;
+float const THRESH = 0.1;
+int T;
+int C;
+int K;
 
 void dot(float *x, float *y, float *z, int m, int n, int p) {
 	for (int i=0; i<m; i++) {
@@ -22,12 +22,9 @@ void dot(float *x, float *y, float *z, int m, int n, int p) {
 	}
 }
 
-///////////////////////////////////////////////////////////////////////////////
-// A+
 void arr_abs(float *x, int m, int n) {
-	for (int i=0; i<m; i++) {
-		for (int j=0; j<n; j++)
-			x[i*n+j] = fabsf(x[i*n+j]);
+	for (int ind=0; ind<m*n; ind++) {
+		x[ind] = fabsf(x[ind]);
 	}
 }
 
@@ -46,73 +43,16 @@ void nearest_atoms(float *similarities, int *inds, int m, int n) {
 	}
 }
 
-float a_plus() {
-	// Allocate patches
-	float *patches = (float*)malloc(N*K*sizeof(float));
-	// Allocate patches_sr
-	float *patches_sr = (float*)malloc(N*F*sizeof(float));
-	// Allocate LR dictionary
-	float *dict_lr = (float*)malloc(K*C*sizeof(float));
-	// Allocate Projections
-	float* projs = (float*)malloc(C*K*F*sizeof(float));
-	// Allocate nearest indices
-	int *nn_inds = (int*)malloc(N*sizeof(int));
-	// Allocate similarities
-	float *similarities = (float*)malloc(N*C*sizeof(float));
-	
-	// Calculate nearest dictionary atoms
-	float start_time = (float)clock() / CLOCKS_PER_SEC;
-	dot(patches, dict_lr, similarities, N, K, C);
-	arr_abs(similarities, N, C);
-	nearest_atoms(similarities, nn_inds, N, C);
-	
-	// Project back to HR space
-	for (int n=0; n<N; n++) {
-		int ind = nn_inds[n];
-		for (int f=0; f<F; f++) {
-			float acc = 0;
-			for (int k=0; k<K; k++)
-				acc += patches[n*K+k] * projs[ind*K*F+k*F+f];
-			patches_sr[n*F+f] = acc;
-		}
-	}
-	float duration = (float)clock() / CLOCKS_PER_SEC - start_time;
-	
-	//printf("duration: %.2f\n", duration);
-	
-	// Deallocate
-	free(patches);
-	free(patches_sr);
-	free(dict_lr);
-	free(projs);
-	free(nn_inds);
-	free(similarities);
-
-	return duration;
-}
-///////////////////////////////////////////////////////////////////////////////
-
 void st(float *x, float *y, int m, int n, float thresh) {
-	for (int i=0; i<m; i++) {
-		for (int j=0; j<n; j++) {
-			float v = x[i*n+j];
-			float sign;
-			if (v > 0) sign = 1.0;
-			else sign = -1.0;
-			float v2 = fabsf(v) - thresh;
-			if (v2 > 0) y[i*n+j] = v2 * sign;
-			else y[i*n+j] = 0;
-		}
+	for (int ind=0; ind<m*n; ind++) {
+		float v = x[ind];
+		y[ind] = ((float)((v > 0) - (v < 0))) * fmaxf(v - thresh, 0);
 	}
 }
 
-///////////////////////////////////////////////////////////////////////////////
-// LCoD
 void sub(float *a, float *b, float *c, int m, int n) {
-	for (int i=0; i<m; i++) {
-		for (int j=0; j<n; j++) {
-			c[i*n+j] = a[i*n+j] - b[i*n+j];
-		}
+	for (int ind=0; ind<m*n; ind++) {
+		c[ind] = a[ind] - b[ind];
 	}
 }
 
@@ -144,7 +84,56 @@ void slice_update(float *z, float *z_hat, int m, int n, int k) {
 		z[i*n+k] = z_hat[i*n+k];
 }
 
-float lcod() {
+void add(float *a, float *b, float *c, int m, int n) {
+	for (int ind=0; ind<m*n; ind++) {
+		c[ind] = a[ind] + b[ind];
+	}
+}
+
+double a_plus() {
+	// Allocate patches
+	float *patches = (float*)malloc(N*K*sizeof(float));
+	// Allocate patches_sr
+	float *patches_sr = (float*)malloc(N*F*sizeof(float));
+	// Allocate LR dictionary
+	float *dict_lr = (float*)malloc(K*C*sizeof(float));
+	// Allocate Projections
+	float* projs = (float*)malloc(C*K*F*sizeof(float));
+	// Allocate nearest indices
+	int *nn_inds = (int*)malloc(N*sizeof(int));
+	// Allocate similarities
+	float *similarities = (float*)malloc(N*C*sizeof(float));
+	
+	// Calculate nearest dictionary atoms
+	double start_time = omp_get_wtime();
+	dot(patches, dict_lr, similarities, N, K, C);
+	arr_abs(similarities, N, C);
+	nearest_atoms(similarities, nn_inds, N, C);
+	
+	// Project back to HR space
+	for (int n=0; n<N; n++) {
+		int ind = nn_inds[n];
+		for (int f=0; f<F; f++) {
+			float acc = 0;
+			for (int k=0; k<K; k++)
+				acc += patches[n*K+k] * projs[ind*K*F+k*F+f];
+			patches_sr[n*F+f] = acc;
+		}
+	}
+	double duration = omp_get_wtime();
+	
+	// Deallocate
+	free(patches);
+	free(patches_sr);
+	free(dict_lr);
+	free(projs);
+	free(nn_inds);
+	free(similarities);
+
+	return duration;
+}
+
+double lcod() {
 	// Allocate patches
 	float *patches = (float*)malloc(N*K*sizeof(float));
 	// Allocate patches_sr
@@ -166,7 +155,7 @@ float lcod() {
 	float *tmp = (float*)malloc(N*C*sizeof(float));
 	
 	// Perform Coordinate Descent
-	float start_time = (float)clock() / CLOCKS_PER_SEC;
+	double start_time = omp_get_wtime();
 	dot(patches, dict_lr, b, N, K, C);
 	for (int t=0; t<T; t++) {
 		st(b, z_hat, N, C, THRESH);
@@ -185,9 +174,7 @@ float lcod() {
 	
 	// Project back to HR space
 	dot(z, dict_hr, patches_sr, N, C, F);
-	float duration = (float)clock() / CLOCKS_PER_SEC - start_time;
-	
-	//printf("duration: %.2f\n", duration);
+	double duration = omp_get_wtime();
 	
 	// De-allocate
 	free(patches);
@@ -202,19 +189,8 @@ float lcod() {
 
 	return duration;
 }
-///////////////////////////////////////////////////////////////////////////////
 
-///////////////////////////////////////////////////////////////////////////////
-// LISTA
-void add(float *a, float *b, float *c, int m, int n) {
-	for (int i=0; i<m; i++) {
-		for (int j=0; j<n; j++) {
-			c[i*n+j] = a[i*n+j] + b[i*n+j];
-		}
-	}
-}
-
-float lista() {
+double lista() {
 	// Allocate patches
 	float *patches = (float*)malloc(N*K*sizeof(float));
 	// Allocate patches_sr
@@ -224,7 +200,6 @@ float lista() {
 	// Allocate HR dictionary
 	float *dict_hr = (float*)malloc(C*F*sizeof(float));
 	// Allocate S matrix
-	//float *s = (float*)malloc(C*C*sizeof(float));
 	float *s1 = (float*)malloc(C*(C/4)*sizeof(float));
 	float *s2 = (float*)malloc((C/4)*C*sizeof(float));
 	float *tmp = (float*)malloc(N*(C/4)*sizeof(float));
@@ -237,11 +212,10 @@ float lista() {
 	float *c = (float*)malloc(N*C*sizeof(float));
 	
 	// Perform Iterated Shrinkage-Thresholding
-	float start_time = (float)clock() / CLOCKS_PER_SEC;
+	double start_time = omp_get_wtime();
 	dot(patches, dict_lr, b, N, K, C);
 	st(b, z, N, C, THRESH);
 	for (int t=1; t<=T; t++) {
-		//dot(z, s, c, N, C, C);
 		dot(z, s1, tmp, N, C, C/4);
 		dot(tmp, s2, c, N, C/4, C);
 		add(b, c, c, N, C);
@@ -250,16 +224,13 @@ float lista() {
 	
 	// Project back to HR space
 	dot(z, dict_hr, patches_sr, N, C, F);
-	float duration = (float)clock() / CLOCKS_PER_SEC - start_time;
-	
-	//printf("duration: %.2f\n", duration);
+	double duration = omp_get_wtime();
 	
 	// Deallocate
 	free(patches);
 	free(patches_sr);
 	free(dict_lr);
 	free(dict_hr);
-	//free(s);
 	free(s1);
 	free(s2);
 	free(tmp);
@@ -269,34 +240,33 @@ float lista() {
 
 	return duration;
 }
-///////////////////////////////////////////////////////////////////////////////
 
-int main(void) {
-	float duration_a_plus = 0;
-	float duration_lcod = 0;
-	float duration_lista = 0;
-
+int main(int argc, char* argv[]) {
+	if (argc != 2) {
+		fprintf(stderr, "Error in usage: %s file_name\n", argv[0]);
+		return 1;
+	}
+	char *file_name = argv[1];
+	
 	FILE *pFile;
-	pFile = fopen("log.txt", "w");
+	pFile = fopen(file_name, "w");
 
 	int Ts[4] = {1, 2, 4, 8};
-	//int Cs[4] = {16, 32, 64, 128};
-	//int Ks[4] = {10, 20, 50, 100};
-	int Cs[3] = {16, 32, 64};
-	int Ks[1] = {28};
+	int Cs[4] = {16, 32, 64, 128};
+	int Ks[4] = {10, 20, 50, 100};
 
 	int const times = 2;
 	for (int it=0; it<4; it++) {
-		for (int ic=0; ic<3; ic++) {
-			for (int ik=0; ik<1; ik++) {
+		for (int ic=0; ic<4; ic++) {
+			for (int ik=0; ik<4; ik++) {
 				T = Ts[it];
 				C = Cs[ic];
 				K = Ks[ik];
-				if (K > C) continue;
+				//if (K > C) continue;
 
-				float duration_a_plus = 0;
-				float duration_lcod = 0;
-				float duration_lista = 0;
+				double duration_a_plus = 0;
+				double duration_lcod = 0;
+				double duration_lista = 0;
 				for (int ind=0; ind<times; ind++) {
 					duration_a_plus += a_plus();
 					duration_lcod += lcod();
@@ -305,10 +275,10 @@ int main(void) {
 				duration_a_plus /= times;
 				duration_lcod /= times;
 				duration_lista /= times;
-				printf("T: %03d C: %03d K: %03d duration (A+/LCoD/LISTA): (%.3f/%.3f/%.3f)\n",
+				printf("T: %03d C: %03d K: %03d duration (A+/LCoD/LISTA): (%.4f/%.4f/%.4f)\n",
 					   T, C, K, duration_a_plus, duration_lcod, duration_lista);
 				fprintf(pFile,
-						"T: %03d C: %03d K: %03d duration (A+/LCoD/LISTA): (%.3f/%.3f/%.3f)\n",
+						"T: %03d C: %03d K: %03d duration (A+/LCoD/LISTA): (%.4f/%.4f/%.4f)\n",
 						T, C, K, duration_a_plus, duration_lcod, duration_lista);
 			}
 		}
