@@ -78,51 +78,41 @@ void sub(float *a, float *b, float *c, int m, int n) {
 	}
 }
 
-void greedy_k1(float *x, float *y, int m, int n) {
+void greedy_ks(float *x, int *y, int m, int n) {
+	#ifdef USE_OPENMP
 	#pragma omp parallel for
-	for (int j=0; j<n; j++) {
-		float acc = 0;
-		for (int i=0; i<m; i++) {
-			acc += fabsf(x[i*n+j]);
+	#endif
+	for (int i=0; i<m; i++) {
+		int best_k = -1;
+		float best_val = -1;
+		for (int j=0; j<n; j++) {
+			float v = fabsf(x[i*n+j]);
+			if ((best_k == -1) || (v > best_val)) {
+				best_k = j;
+				best_val = v;
+			}
 		}
-		y[j] = acc;
+		y[i] = best_k;
 	}
 }
 
-int greedy_k2(float *y, int n) {
-	int best_k = -1;
-	float best_val = -1;
-	for (int j=0; j<n; j++) {
-		float val = y[j];
-		if ((best_k == -1) || (val > best_val)) {
-			best_k = j;
-			best_val = val;
-		}
-	}
-	return best_k;
-}
-
-void outer_update(float *x, float *y, float *z, int m, int n, int k) {
-	#ifdef USE_OPENBLAS
-	cblas_sger(CblasColMajor, m, n, 1.0, &x[k*m], 1, &y[k*m], 1, z, m);
-	#else
+void outer_update(float *x, float *y, float *z, int *ks, int m, int n) {
 	#ifdef USE_OPENMP
 	#pragma omp parallel for collapse(2)
 	#endif
 	for (int i=0; i<m; i++) {
 		for (int j=0; j<n; j++) {
-			z[i*n+j] += x[i*n+k]*y[k*n+j];
+			z[i*n+j] += x[i*n+ks[i]] * y[ks[i]*n+j];
 		}
 	}
-	#endif
 }
 
-void slice_update(float *z, float *z_hat, int m, int n, int k) {
+void slice_update(float *z, float *z_hat, int *ks, int m, int n) {
 	#ifdef USE_OPENMP
 	#pragma omp parallel for
 	#endif
 	for (int i=0; i<m; i++) {
-		z[i*n+k] = z_hat[i*n+k];
+		z[i*n+ks[i]] = z_hat[i*n+ks[i]];
 	}
 }
 
@@ -207,27 +197,25 @@ double lcod() {
 	float *z_hat = (float*)malloc(N*C*sizeof(float));
 	// Allocate tmp
 	float *tmp = (float*)malloc(N*C*sizeof(float));
-	// Allocate l1s
-	float *l1s = (float*)malloc(C*sizeof(float));
+	// Allocate ks
+	int *ks = (int*)malloc(N*sizeof(int));
 	
 	
 	// Perform Coordinate Descent
 	double start_time = omp_get_wtime();
 	dot(patches, dict_lr, b, N, K, C);
-	for (int t=0; t<T-1; t++) {
+	for (int t=1; t<=T-1; t++) {
 		st(b, z_hat, N, C, THRESH);
 		int k;
 		if (t > 1) {
 			sub(z_hat, z, tmp, N, C);
-			greedy_k1(tmp, l1s, N, C);
-			k = greedy_k2(l1s, C);
-			outer_update(tmp, s, b, N, C, k);
+			greedy_ks(tmp, ks, N, C);
+			outer_update(tmp, s, b, ks, N, C);
 		} else {
-			greedy_k1(z_hat, l1s, N, C);
-			k = greedy_k2(l1s, C);
-			outer_update(z_hat, s, b, N, C, k);
+			greedy_ks(z_hat, ks, N, C);
+			outer_update(z_hat, s, b, ks, N, C);
 		}
-		slice_update(z, z_hat, N, C, k);
+		slice_update(z, z_hat, ks, N, C);
 	}
 	st(b, z, N, C, THRESH);
 	
@@ -246,7 +234,7 @@ double lcod() {
 	free(z);
 	free(z_hat);
 	free(tmp);
-	free(l1s);
+	free(ks);
 
 	return duration;
 }
@@ -311,12 +299,12 @@ int main(int argc, char* argv[]) {
 		pFile = fopen(file_name, "w");
 	}
 
-	int Ts[3] = {1, 2, 4};
+	int Ts[4] = {1, 2, 4, 8};
 	int Cs[4] = {16, 32, 64, 128};
 	int Ks[4] = {10, 20, 50, 100};
 
-	int const times = 2;
-	for (int it=0; it<3; it++) {
+	int const times = 1;
+	for (int it=0; it<4; it++) {
 		for (int ic=0; ic<4; ic++) {
 			for (int ik=0; ik<4; ik++) {
 				T = Ts[it];
