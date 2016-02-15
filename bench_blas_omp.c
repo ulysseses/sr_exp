@@ -5,7 +5,7 @@
 #include <cblas.h>
 
 int const F = 36;
-int const N = 18800;
+int const N = 18800 * 100;
 float const THRESH = 0.1;
 int T;
 int C;
@@ -78,33 +78,27 @@ void sub(float *a, float *b, float *c, int m, int n) {
 	}
 }
 
-
-int greedy_k(float *x, int m, int n) {
-	int best_k = -1;
-	float best_val = -1;
-	
-	#ifdef USE_OPENMP
+void greedy_k1(float *x, float *y, int m, int n) {
 	#pragma omp parallel for
-	#endif
 	for (int j=0; j<n; j++) {
 		float acc = 0;
-		for (int i=0; i<m; i++)
+		for (int i=0; i<m; i++) {
 			acc += fabsf(x[i*n+j]);
-		
-		#ifdef USE_OPENMP
-		#pragma omp critical(check_best)
-		{
-		#endif
-			if ((best_k == -1) || (acc > best_val)) {
-				best_k = j;
-				best_val = acc;
-			}
-		#ifdef USE_OPENMP
 		}
-		#endif
-	
+		y[j] = acc;
 	}
-	
+}
+
+int greedy_k2(float *y, int n) {
+	int best_k = -1;
+	float best_val = -1;
+	for (int j=0; j<n; j++) {
+		float val = y[j];
+		if ((best_k == -1) || (val > best_val)) {
+			best_k = j;
+			best_val = val;
+		}
+	}
 	return best_k;
 }
 
@@ -213,6 +207,9 @@ double lcod() {
 	float *z_hat = (float*)malloc(N*C*sizeof(float));
 	// Allocate tmp
 	float *tmp = (float*)malloc(N*C*sizeof(float));
+	// Allocate l1s
+	float *l1s = (float*)malloc(C*sizeof(float));
+	
 	
 	// Perform Coordinate Descent
 	double start_time = omp_get_wtime();
@@ -222,10 +219,12 @@ double lcod() {
 		int k;
 		if (t > 1) {
 			sub(z_hat, z, tmp, N, C);
-			k = greedy_k(tmp, N, C);
+			greedy_k1(tmp, l1s, N, C);
+			k = greedy_k2(l1s, C);
 			outer_update(tmp, s, b, N, C, k);
 		} else {
-			k = greedy_k(z_hat, N, C);
+			greedy_k1(z_hat, l1s, N, C);
+			k = greedy_k2(l1s, C);
 			outer_update(z_hat, s, b, N, C, k);
 		}
 		slice_update(z, z_hat, N, C, k);
@@ -247,6 +246,7 @@ double lcod() {
 	free(z);
 	free(z_hat);
 	free(tmp);
+	free(l1s);
 
 	return duration;
 }
@@ -311,18 +311,17 @@ int main(int argc, char* argv[]) {
 		pFile = fopen(file_name, "w");
 	}
 
-	int Ts[4] = {1, 2, 4, 8};
+	int Ts[3] = {1, 2, 4};
 	int Cs[4] = {16, 32, 64, 128};
 	int Ks[4] = {10, 20, 50, 100};
 
-	int const times = 5;
-	for (int it=0; it<4; it++) {
+	int const times = 2;
+	for (int it=0; it<3; it++) {
 		for (int ic=0; ic<4; ic++) {
 			for (int ik=0; ik<4; ik++) {
 				T = Ts[it];
 				C = Cs[ic];
 				K = Ks[ik];
-				//if (K > C) continue;
 
 				double duration_a_plus = 0;
 				double duration_lcod = 0;
