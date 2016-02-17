@@ -4,6 +4,7 @@
 #include <omp.h>
 #include <cblas.h>
 
+// 8000 x 6000
 int const F = 36;
 int const N = 18800 * 100;
 float const THRESH = 0.1;
@@ -113,15 +114,6 @@ void slice_update(float *z, float *z_hat, int *ks, int m, int n) {
 	#endif
 	for (int i=0; i<m; i++) {
 		z[i*n+ks[i]] = z_hat[i*n+ks[i]];
-	}
-}
-
-void add(float *a, float *b, float *c, int m, int n) {
-	#ifdef USE_OPENMP
-	#pragma omp parallel for
-	#endif
-	for (int ind=0; ind<m*n; ind++) {
-		c[ind] = a[ind] + b[ind];
 	}
 }
 
@@ -239,95 +231,78 @@ double lcod() {
 	return duration;
 }
 
-double lista() {
-	// Allocate patches
-	float *patches = (float*)malloc(N*K*sizeof(float));
-	// Allocate patches_sr
-	float *patches_sr = (float*)malloc(N*F*sizeof(float));
-	// Allocate LR dictionary
-	float *dict_lr = (float*)malloc(K*C*sizeof(float));
-	// Allocate HR dictionary
-	float *dict_hr = (float*)malloc(C*F*sizeof(float));
-	// Allocate S matrix
-	float *s1 = (float*)malloc(C*(C/4)*sizeof(float));
-	float *s2 = (float*)malloc((C/4)*C*sizeof(float));
-	float *tmp = (float*)malloc(N*(C/4)*sizeof(float));
-	
-	// Allocate B
-	float *b = (float*)malloc(N*C*sizeof(float));
-	// Allocate Z
-	float *z = (float*)malloc(N*C*sizeof(float));
-	// Allocate C
-	float *c = (float*)malloc(N*C*sizeof(float));
-	
-	// Perform Iterated Shrinkage-Thresholding
-	double start_time = omp_get_wtime();
-	dot(patches, dict_lr, b, N, K, C);
-	st(b, z, N, C, THRESH);
-	for (int t=1; t<=T; t++) {
-		dot(z, s1, tmp, N, C, C/4);
-		dot(tmp, s2, c, N, C/4, C);
-		add(b, c, c, N, C);
-		st(c, z, N, C, THRESH);
-	}
-	
-	// Project back to HR space
-	dot(z, dict_hr, patches_sr, N, C, F);
-	
-	double duration = omp_get_wtime() - start_time;
-
-	// Deallocate
-	free(patches);
-	free(patches_sr);
-	free(dict_lr);
-	free(dict_hr);
-	free(s1);
-	free(s2);
-	free(tmp);
-	free(b);
-	free(z);
-	free(c);
-
-	return duration;
-}
-
-int main(int argc, char* argv[]) {
+int main_a_plus(int argc, char* argv[]) {
 	char *file_name;
 	FILE *pFile;
 	if (argc > 1) {
 		file_name = argv[1];
 		pFile = fopen(file_name, "w");
+		fprintf(pFile, "A+\n");
 	}
+	int const times = 2;
+
+	int Cs[7] = {16, 32, 64, 128, 256, 512, 1024};
+	int Ks[1] = {28};
+	
+	for (int ic=0; ic<7; ic++) {
+	    for (int ik=0; ik<1; ik++) {
+	        C = Cs[ic];
+	        K = Ks[ik];
+	        
+	        double duration_a_plus = 0;
+	        for (int ind=0; ind<times; ind++) {
+	            duration_a_plus += a_plus();
+	        }
+			duration_a_plus /= times;
+			printf("C: %03d K: %03d duration: %.4f\n",
+				   C, K, duration_a_plus);
+		   	if (argc > 1) {
+				fprintf(pFile,
+						"C: %03d K: %03d duration: %.4f\n",
+						C, K, duration_a_plus);
+		   	}
+	    }
+	}
+	
+	if (argc > 1) fclose(pFile);
+
+	return 0;
+}
+
+int main_lcod(int argc, char* argv[]) {
+	char *file_name;
+	FILE *pFile;
+	if (argc > 1) {
+		file_name = argv[1];
+		pFile = fopen(file_name, "a");
+		fprintf(pFile, "LCOD\n");
+	}
+	int const times = 2;
 
 	int Ts[4] = {1, 2, 4, 8};
-	int Cs[4] = {16, 32, 64, 128};
-	int Ks[4] = {10, 20, 50, 100};
+	int Cs[4] = {32, 64, 128, 256};
+	int Ks[2] = {28, 56};
 
-	int const times = 1;
 	for (int it=0; it<4; it++) {
 		for (int ic=0; ic<4; ic++) {
-			for (int ik=0; ik<4; ik++) {
+			for (int ik=0; ik<2; ik++) {
 				T = Ts[it];
 				C = Cs[ic];
 				K = Ks[ik];
+				
+				if (K >= C) continue;
 
-				double duration_a_plus = 0;
 				double duration_lcod = 0;
-				double duration_lista = 0;
 				for (int ind=0; ind<times; ind++) {
-					duration_a_plus += a_plus();
 					duration_lcod += lcod();
-					duration_lista += lista();
 				}
-				duration_a_plus /= times;
 				duration_lcod /= times;
-				duration_lista /= times;
-				printf("T: %03d C: %03d K: %03d duration (A+/LCoD/LISTA): (%.4f/%.4f/%.4f)\n",
-					   T, C, K, duration_a_plus, duration_lcod, duration_lista);
+				printf("T: %03d C: %03d K: %03d duration: %.4f\n",
+					   T, C, K, duration_lcod);
 			   	if (argc > 1) {
 					fprintf(pFile,
-							"T: %03d C: %03d K: %03d duration (A+/LCoD/LISTA): (%.4f/%.4f/%.4f)\n",
-							T, C, K, duration_a_plus, duration_lcod, duration_lista);
+							"T: %03d C: %03d K: %03d duration: %.4f\n",
+							T, C, K, duration_lcod);
 			   	}
 			}
 		}
@@ -336,4 +311,10 @@ int main(int argc, char* argv[]) {
 	if (argc > 1) fclose(pFile);
 
 	return 0;
+}
+
+int main(int argc, char* argv[]) {
+    int return_code1 = main_a_plus(argc, argv);
+    int return_code2 = main_lcod(argc, argv);
+    return return_code1 + return_code2;
 }
