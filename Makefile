@@ -1,7 +1,7 @@
 EXECUTABLE := bench_mp_blas
 OBJS := bench.o
 
-CFLAGS := -std=c99 -fopenmp -DUSE_OPENMP -DUSE_OPENBLAS
+CFLAGS := -O3 -std=c99 -fopenmp -DUSE_OPENMP -DUSE_OPENBLAS
 
 INCLUDES := -I/opt/openblas/include
 LIBLOCS := -L/opt/openblas/lib
