@@ -117,6 +117,15 @@ void slice_update(float *z, float *z_hat, int *ks, int m, int n) {
 	}
 }
 
+void add(float *a, float *b, float *c, int m, int n) {
+	#ifdef USE_OPENMP
+	#pragma omp parallel for
+	#endif
+	for (int ind=0; ind<m*n; ind++) {
+		c[ind] = a[ind] + b[ind];
+	}
+}
+
 double a_plus() {
 	// Allocate patches
 	float *patches = (float*)malloc(N*K*sizeof(float));
@@ -231,6 +240,58 @@ double lcod() {
 	return duration;
 }
 
+double lista() {
+	// Allocate patches
+	float *patches = (float*)malloc(N*K*sizeof(float));
+	// Allocate patches_sr
+	float *patches_sr = (float*)malloc(N*F*sizeof(float));
+	// Allocate LR dictionary
+	float *dict_lr = (float*)malloc(K*C*sizeof(float));
+	// Allocate HR dictionary
+	float *dict_hr = (float*)malloc(C*F*sizeof(float));
+	// Allocate S matrix
+	float *s1 = (float*)malloc(C*(C/4)*sizeof(float));
+	float *s2 = (float*)malloc((C/4)*C*sizeof(float));
+	float *tmp = (float*)malloc(N*(C/4)*sizeof(float));
+	
+	// Allocate B
+	float *b = (float*)malloc(N*C*sizeof(float));
+	// Allocate Z
+	float *z = (float*)malloc(N*C*sizeof(float));
+	// Allocate C
+	float *c = (float*)malloc(N*C*sizeof(float));
+	
+	// Perform Iterated Shrinkage-Thresholding
+	double start_time = omp_get_wtime();
+	dot(patches, dict_lr, b, N, K, C);
+	st(b, z, N, C, THRESH);
+	for (int t=1; t<=T; t++) {
+		dot(z, s1, tmp, N, C, C/4);
+		dot(tmp, s2, c, N, C/4, C);
+		add(b, c, c, N, C);
+		st(c, z, N, C, THRESH);
+	}
+	
+	// Project back to HR space
+	dot(z, dict_hr, patches_sr, N, C, F);
+	
+	double duration = omp_get_wtime() - start_time;
+
+	// Deallocate
+	free(patches);
+	free(patches_sr);
+	free(dict_lr);
+	free(dict_hr);
+	free(s1);
+	free(s2);
+	free(tmp);
+	free(b);
+	free(z);
+	free(c);
+
+	return duration;
+}
+
 int main_a_plus(int argc, char* argv[]) {
 	char *file_name;
 	FILE *pFile;
@@ -289,8 +350,6 @@ int main_lcod(int argc, char* argv[]) {
 				T = Ts[it];
 				C = Cs[ic];
 				K = Ks[ik];
-				
-				if (K >= C) continue;
 
 				double duration_lcod = 0;
 				for (int ind=0; ind<times; ind++) {
@@ -313,8 +372,51 @@ int main_lcod(int argc, char* argv[]) {
 	return 0;
 }
 
+int main_lista(int argc, char* argv[]) {
+	char *file_name;
+	FILE *pFile;
+	if (argc > 1) {
+		file_name = argv[1];
+		pFile = fopen(file_name, "a");
+		fprintf(pFile, "LISTA\n");
+	}
+	int const times = 2;
+
+	int Ts[4] = {1, 2, 4, 8};
+	int Cs[4] = {32, 64, 128, 256};
+	int Ks[2] = {28, 56};
+
+	for (int it=0; it<4; it++) {
+		for (int ic=0; ic<4; ic++) {
+			for (int ik=0; ik<2; ik++) {
+				T = Ts[it];
+				C = Cs[ic];
+				K = Ks[ik];
+
+				double duration_lista = 0;
+				for (int ind=0; ind<times; ind++) {
+					duration_lista += lista();
+				}
+				duration_lista /= times;
+				printf("T: %03d C: %03d K: %03d duration: %.4f\n",
+					   T, C, K, duration_lista);
+			   	if (argc > 1) {
+					fprintf(pFile,
+							"T: %03d C: %03d K: %03d duration: %.4f\n",
+							T, C, K, duration_lista);
+			   	}
+			}
+		}
+	}
+	
+	if (argc > 1) fclose(pFile);
+
+	return 0;
+}
+
 int main(int argc, char* argv[]) {
     int return_code1 = main_a_plus(argc, argv);
     int return_code2 = main_lcod(argc, argv);
-    return return_code1 + return_code2;
+    int return_code3 = main_lista(argc, argv);
+    return return_code1 + return_code2 + return_code3;
 }
